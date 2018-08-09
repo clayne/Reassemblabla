@@ -1,0 +1,1 @@
+gcc -o ex_relro_reassemblable ex_relro_reassemblable.s -m32  /lib/i386-linux-gnu/libc.so.6 

@@ -1,0 +1,229 @@
+
+ex_reassemblable.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:	31 ed                	xor    %ebp,%ebp
+   2:	5e                   	pop    %esi
+   3:	89 e1                	mov    %esp,%ecx
+   5:	83 e4 f0             	and    $0xfffffff0,%esp
+   8:	50                   	push   %eax
+   9:	54                   	push   %esp
+   a:	52                   	push   %edx
+   b:	68 9a 01 00 00       	push   $0x19a
+  10:	68 3f 01 00 00       	push   $0x13f
+  15:	51                   	push   %ecx
+  16:	56                   	push   %esi
+  17:	68 0a 01 00 00       	push   $0x10a
+  1c:	e8 fc ff ff ff       	call   1d <_start+0x1d>
+  21:	f4                   	hlt    
+  22:	66 90                	xchg   %ax,%ax
+  24:	66 90                	xchg   %ax,%ax
+  26:	66 90                	xchg   %ax,%ax
+  28:	66 90                	xchg   %ax,%ax
+  2a:	66 90                	xchg   %ax,%ax
+  2c:	66 90                	xchg   %ax,%ax
+  2e:	66 90                	xchg   %ax,%ax
+
+00000030 <MYSYM_10>:
+  30:	8b 1c 24             	mov    (%esp),%ebx
+  33:	c3                   	ret    
+  34:	66 90                	xchg   %ax,%ax
+  36:	66 90                	xchg   %ax,%ax
+  38:	66 90                	xchg   %ax,%ax
+  3a:	66 90                	xchg   %ax,%ax
+  3c:	66 90                	xchg   %ax,%ax
+  3e:	66 90                	xchg   %ax,%ax
+
+00000040 <MYSYM_12>:
+  40:	b8 03 00 00 00       	mov    $0x3,%eax
+  45:	2d 00 00 00 00       	sub    $0x0,%eax
+  4a:	83 f8 06             	cmp    $0x6,%eax
+  4d:	76 1a                	jbe    69 <MYSYM_7>
+  4f:	b8 00 00 00 00       	mov    $0x0,%eax
+  54:	85 c0                	test   %eax,%eax
+  56:	74 11                	je     69 <MYSYM_7>
+  58:	55                   	push   %ebp
+  59:	89 e5                	mov    %esp,%ebp
+  5b:	83 ec 14             	sub    $0x14,%esp
+  5e:	68 00 00 00 00       	push   $0x0
+  63:	ff d0                	call   *%eax
+  65:	83 c4 10             	add    $0x10,%esp
+  68:	c9                   	leave  
+
+00000069 <MYSYM_7>:
+  69:	f3 c3                	repz ret 
+  6b:	90                   	nop
+  6c:	eb 12                	jmp    80 <MYSYM_0>
+  6e:	90                   	nop
+  6f:	90                   	nop
+  70:	90                   	nop
+  71:	90                   	nop
+  72:	90                   	nop
+  73:	90                   	nop
+  74:	90                   	nop
+  75:	90                   	nop
+  76:	90                   	nop
+  77:	90                   	nop
+  78:	90                   	nop
+  79:	90                   	nop
+  7a:	90                   	nop
+  7b:	90                   	nop
+  7c:	90                   	nop
+  7d:	90                   	nop
+  7e:	90                   	nop
+  7f:	90                   	nop
+
+00000080 <MYSYM_0>:
+  80:	b8 00 00 00 00       	mov    $0x0,%eax
+  85:	2d 00 00 00 00       	sub    $0x0,%eax
+  8a:	c1 f8 02             	sar    $0x2,%eax
+  8d:	89 c2                	mov    %eax,%edx
+  8f:	c1 ea 1f             	shr    $0x1f,%edx
+  92:	01 d0                	add    %edx,%eax
+  94:	d1 f8                	sar    %eax
+  96:	74 1b                	je     b3 <MYSYM_9>
+  98:	ba 00 00 00 00       	mov    $0x0,%edx
+  9d:	85 d2                	test   %edx,%edx
+  9f:	74 12                	je     b3 <MYSYM_9>
+  a1:	55                   	push   %ebp
+  a2:	89 e5                	mov    %esp,%ebp
+  a4:	83 ec 10             	sub    $0x10,%esp
+  a7:	50                   	push   %eax
+  a8:	68 00 00 00 00       	push   $0x0
+  ad:	ff d2                	call   *%edx
+  af:	83 c4 10             	add    $0x10,%esp
+  b2:	c9                   	leave  
+
+000000b3 <MYSYM_9>:
+  b3:	f3 c3                	repz ret 
+  b5:	8d 74 26 00          	lea    0x0(%esi,%eiz,1),%esi
+  b9:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi
+  c0:	80 3d 00 00 00 00 00 	cmpb   $0x0,0x0
+  c7:	75 13                	jne    dc <MYSYM_11>
+  c9:	55                   	push   %ebp
+  ca:	89 e5                	mov    %esp,%ebp
+  cc:	83 ec 08             	sub    $0x8,%esp
+  cf:	e8 6c ff ff ff       	call   40 <MYSYM_12>
+  d4:	c6 05 00 00 00 00 01 	movb   $0x1,0x0
+  db:	c9                   	leave  
+
+000000dc <MYSYM_11>:
+  dc:	f3 c3                	repz ret 
+  de:	66 90                	xchg   %ax,%ax
+  e0:	b8 10 9f 04 08       	mov    $0x8049f10,%eax
+  e5:	8b 10                	mov    (%eax),%edx
+  e7:	85 d2                	test   %edx,%edx
+  e9:	75 04                	jne    ef <MYSYM_14>
+
+000000eb <MYSYM_15>:
+  eb:	eb 93                	jmp    80 <MYSYM_0>
+  ed:	8d 36                	lea    (%esi),%esi
+
+000000ef <MYSYM_14>:
+  ef:	ba 00 00 00 00       	mov    $0x0,%edx
+  f4:	85 d2                	test   %edx,%edx
+  f6:	74 f3                	je     eb <MYSYM_15>
+  f8:	55                   	push   %ebp
+  f9:	89 e5                	mov    %esp,%ebp
+  fb:	83 ec 14             	sub    $0x14,%esp
+  fe:	50                   	push   %eax
+  ff:	ff d2                	call   *%edx
+ 101:	83 c4 10             	add    $0x10,%esp
+ 104:	c9                   	leave  
+ 105:	e9 76 ff ff ff       	jmp    80 <MYSYM_0>
+
+0000010a <MYSYM_4>:
+ 10a:	8d 4c 24 04          	lea    0x4(%esp),%ecx
+ 10e:	83 e4 f0             	and    $0xfffffff0,%esp
+ 111:	ff 71 fc             	pushl  -0x4(%ecx)
+ 114:	55                   	push   %ebp
+ 115:	89 e5                	mov    %esp,%ebp
+ 117:	51                   	push   %ecx
+ 118:	83 ec 04             	sub    $0x4,%esp
+ 11b:	83 ec 0c             	sub    $0xc,%esp
+ 11e:	68 20 00 00 00       	push   $0x20
+ 123:	e8 fc ff ff ff       	call   124 <MYSYM_4+0x1a>
+ 128:	83 c4 10             	add    $0x10,%esp
+ 12b:	90                   	nop
+ 12c:	8b 4d fc             	mov    -0x4(%ebp),%ecx
+ 12f:	c9                   	leave  
+ 130:	8d 61 fc             	lea    -0x4(%ecx),%esp
+ 133:	c3                   	ret    
+ 134:	66 90                	xchg   %ax,%ax
+ 136:	66 90                	xchg   %ax,%ax
+ 138:	66 90                	xchg   %ax,%ax
+ 13a:	66 90                	xchg   %ax,%ax
+ 13c:	66 90                	xchg   %ax,%ax
+ 13e:	90                   	nop
+
+0000013f <MYSYM_3>:
+ 13f:	55                   	push   %ebp
+ 140:	57                   	push   %edi
+ 141:	56                   	push   %esi
+ 142:	53                   	push   %ebx
+ 143:	e8 e8 fe ff ff       	call   30 <MYSYM_10>
+ 148:	81 c3 b7 1b 00 00    	add    $0x1bb7,%ebx
+ 14e:	83 ec 0c             	sub    $0xc,%esp
+ 151:	8b 6c 24 20          	mov    0x20(%esp),%ebp
+ 155:	8d b3 0c ff ff ff    	lea    -0xf4(%ebx),%esi
+ 15b:	e8 a0 fe ff ff       	call   0 <_start>
+ 160:	8d 83 08 ff ff ff    	lea    -0xf8(%ebx),%eax
+ 166:	29 c6                	sub    %eax,%esi
+ 168:	c1 fe 02             	sar    $0x2,%esi
+ 16b:	85 f6                	test   %esi,%esi
+ 16d:	74 21                	je     190 <MYSYM_8>
+ 16f:	31 ff                	xor    %edi,%edi
+ 171:	8d 36                	lea    (%esi),%esi
+
+00000173 <MYSYM_13>:
+ 173:	83 ec 04             	sub    $0x4,%esp
+ 176:	ff 74 24 2c          	pushl  0x2c(%esp)
+ 17a:	ff 74 24 2c          	pushl  0x2c(%esp)
+ 17e:	55                   	push   %ebp
+ 17f:	ff 94 bb 08 ff ff ff 	call   *-0xf8(%ebx,%edi,4)
+ 186:	83 c7 01             	add    $0x1,%edi
+ 189:	83 c4 10             	add    $0x10,%esp
+ 18c:	39 f7                	cmp    %esi,%edi
+ 18e:	75 e3                	jne    173 <MYSYM_13>
+
+00000190 <MYSYM_8>:
+ 190:	83 c4 0c             	add    $0xc,%esp
+ 193:	5b                   	pop    %ebx
+ 194:	5e                   	pop    %esi
+ 195:	5f                   	pop    %edi
+ 196:	5d                   	pop    %ebp
+ 197:	c3                   	ret    
+ 198:	8d 36                	lea    (%esi),%esi
+
+0000019a <MYSYM_1>:
+ 19a:	f3 c3                	repz ret 
+
+Disassembly of section .data:
+
+00000000 <.data>:
+	...
+
+Disassembly of section .bss:
+
+00000000 <MYSYM_6>:
+   0:	00 00                	add    %al,(%eax)
+	...
+
+00000003 <MYSYM_5>:
+	...
+
+Disassembly of section .rodata:
+
+00000000 <MYSYM_2-0x20>:
+   0:	03 00                	add    (%eax),%eax
+   2:	00 00                	add    %al,(%eax)
+   4:	01 00                	add    %eax,(%eax)
+   6:	02 00                	add    (%eax),%al
+	...
+
+00000020 <MYSYM_2>:
+  20:	67 6f                	outsl  %ds:(%si),(%dx)
+	...

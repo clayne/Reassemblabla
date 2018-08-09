@@ -1,0 +1,2 @@
+as -o ex_relro_reassemblable.o ex_relro_reassemblable.s
+ld -o ex_relro_reassemblable -dynamic-linker /lib/ld-linux.so.2  /usr/lib/i386-linux-gnu/crti.o -lc ex_relro_reassemblable.o /usr/lib/i386-linux-gnu/crtn.o
