@@ -17,7 +17,7 @@ from etc import *
 def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 	cs = Cs(CS_ARCH_X86, CS_MODE_32)
 	cs.detail = True   
-	cs.syntax = CS_OPT_SYNTAX_INTEL # CS_OPT_SYNTAX_NASM, CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT
+	cs.syntax = CS_OPT_SYNTAX_ATT # CS_OPT_SYNTAX_NASM, CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT
 	dics_of_text = {} 
 	_offset = 0
 	

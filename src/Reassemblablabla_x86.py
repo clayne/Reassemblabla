@@ -51,27 +51,16 @@ if __name__=="__main__":
 	entrypointaddr = findenytypoint(options.filename)
 	resdic['.text'][entrypointaddr][0] = "_start:"
 	
+
 	# checksec 돌린다 (pie, packed, relro 등등 사용가능)
 	checksec_gogo = pwnlib.elf.elf.ELF(options.filename, False)
 	
-	# reldyn, relplt = get_reltbl(options.filename) #TODO: for beautiful,,, get_reldyn + get_relplt  
 	
-	
-	
-	if checksec_gogo.relro == 'Full': # if full_relro라면
-		print "full relro!"
-		reldyn = get_reldyn(options.filename)
-		lfunc_revoc_linking_fullrelro(resdic, reldyn)
-
-	else: 
-		print "partial relro!"
-		relplt = get_relplt(options.filename)
-		lfunc_revoc_linking(resdic, relplt) 
-		#resdic['.text'] = lfunc_revoc_linking(resdic['.text']) 
-		#resdic['.init'] = lfunc_revoc_linking(resdic['.init']) 
-	
-	
-	
+	RELO_TABLES = {}
+	RELO_TABLES['.rel.dyn'] = get_reldyn(options.filename)
+	RELO_TABLES['.rel.plt'] = get_relplt(options.filename)
+	RELO_INFO = checksec_gogo.relro
+	lfunc_revoc_linking(resdic, RELO_INFO , RELO_TABLES)
 	
 	
 	# BSS dynamic symbol handling
