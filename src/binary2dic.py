@@ -151,9 +151,6 @@ def bugB(i_op_str):
 		NEW_op_str = i_op_str
 	return NEW_op_str
 
-
-
-
 def KEYSTONE_asm(CODE):	
 	try:
 		# Initialize engine in X86-32bit mode
@@ -500,15 +497,14 @@ def get_dynsymtab(filename): # 이게 제대로 동작을 안함? 아니 하는�
 		l = line.split(' ')
 		if len(l) > 5:
 			if 'g' in l[1]: # global symbol 만 취급합니더,,,ㅋㅋ
-				'''	
-				if l[3] == '.bss': # ['08051198' : 'g', 'DO', '.bss', '00000004', 'GLIBC_2.0', 'stdout'] 이런형식
-					symtab[int('0x'+l[0], 16)] = l[6]
-				'''	
 				if l[3] not in symtab.keys(): symtab[l[3]] = {} # init
-
 				symtab[l[3]][int('0x'+l[0], 16)] = l[6]
-
-
+	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+	for sname in symtab.keys():
+		for addr in symtab[sname].keys():
+			print "{} : {}".format(addr, symtab[sname][addr])
 	return symtab
 
 def get_reldyn(filename):

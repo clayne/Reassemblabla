@@ -73,7 +73,10 @@ if __name__=="__main__":
 	symtab = get_dynsymtab(options.filename) 
 	global_symbolize_bss(resdic['.bss'], symtab['.bss'])
 	
-
+	# Other section symbol handling #URGENT: global_symbolize_bss와 결과적으로 똑같은거임. 함수 합쳐야지...
+	for SectionName in CodeSections_WRITE:
+		if SectionName in resdic.keys() and SectionName in symtab.keys():
+			global_symbolize_codesection(resdic[SectionName], symtab[SectionName])
 
 	# 심볼라이즈 전에 brackets를 다 제거해야징
 	for SectionName in CodeSections_WRITE:
@@ -123,9 +126,9 @@ if __name__=="__main__":
 				resdic['.rodata'].values()[i][1] = " .byte 0x49, 0x4e, 0x53, 0x45, 0x52, 0x54, 0x45, 0x44, 0x5f\n" + resdic['.rodata'].values()[i][1]
 	
 	if options.comment is True:
-		gen_assemblyfile(resdic, options.filename, 1)
+		gen_assemblyfile(resdic, options.filename, symtab, 1)
 	else:
-		gen_assemblyfile(resdic, options.filename, 0)
+		gen_assemblyfile(resdic, options.filename, symtab, 0)
 	gen_compilescript(options.filename)
 	gen_assemblescript(options.filename)
 	gen_assemblescript_for_sharedlibrary(options.filename) # TODO: temporary, 항상 sname은 libjiwon.so.1 이다. 

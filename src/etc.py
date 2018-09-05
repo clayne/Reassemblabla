@@ -319,10 +319,24 @@ def gen_compilescript(filename):
 	cmd = "chmod +x " + onlyfilename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblyfile(resdic, filename, comment):
+def gen_assemblyfile(resdic, filename, symtab, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 	f = open(onlyfilename + "_reassemblable.s",'w')
-	# f.write(".global main\n")
+
+	# 다이나믹 글로벌 심볼들을 붙여준다. 
+	for sectionName in symtab.keys():
+		if sectionName in CodeSections_WRITE: # 다이나믹 심볼이 코드섹션에 있다면?
+			for DYNSYM_NAME in symtab[sectionName].values():
+				f.write('.global ' + DYNSYM_NAME + '\n')
+				f.write('.type ' + DYNSYM_NAME + ', @function\n')
+
+		'''
+		 .global ysum
+		 .type ysum, @function 
+		 이건데
+		 _init, _fini 도 이렇게 해줘도 동작에 문제가 없나?  ㅇㅇ 문제없음. 
+		'''
+
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
