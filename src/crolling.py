@@ -50,7 +50,7 @@ exist = []
 for i in range(1,333): 
 	url = 'https://c9x.me/x86/html/file_module_x86_id_{}.html'.format(i)
 	text, name = get_html(url)
-	if '/r' in text:
+	if '80' in text or '81' in text or '82' in text or '83' in text:
 		print name + ' [O]'
 		exist.append(i)
 		count = text.count('<code>')
@@ -59,8 +59,19 @@ for i in range(1,333):
 			end   = text.index('</code>')
 			line = text[start:end]
 			text = text[end + len('</code>'):]
-			if '/r' in line:
+			if '80' in line:
+				print " "+line
+			elif '81' in line:
+				print " "+line
+			elif '82' in line:
+				print " "+line
+			elif '83' in line:
 				print " "+line
 	else:
 		"no" 
 print exist
+
+
+
+
+

@@ -9,6 +9,26 @@ import subprocess
 import re
 from optparse import OptionParser
 import binascii 
+from global_variables import *
+
+def get_soname(filename):
+    try:
+        out = subprocess.check_output(['objdump', '-p', filename])
+    except:
+        return ''
+    else:
+        result = re.search('^\s+SONAME\s+(.+)$',out,re.MULTILINE)
+        if result:
+            return result.group(1)
+        else:
+            return ''
+
+def extract_register(line):
+	reglist = []
+	while '%' in line: 
+		line = line[line.index('%')+1:]
+		reglist.append(line[:3])
+	return reglist
 
 def ishex(str):
 	for i in range(len(str)):
@@ -27,20 +47,33 @@ def extract_hex_addr(line):
 		push   $0x8048540                --> [8048540] --> [134513984]
 	'''
 	# list1 = re.findall(r'[0-9a-f]+', line) <- 예전코드인데, 어떤 스트링라인 "123 add fdfd qqdq" 에서 123, add,fdfd, d 를 추출하여 리스트로 만드는 코드
+	
+
 	line = line.replace(',',' ').replace('(',' ').replace(')',' ')
 	line = re.sub('\s+',' ',line).strip() # duplicate space, tab --> single space
 	line = line.split(' ')[1:] # opcode 제거 
+
 	addrlist = []
-	
 	for i in xrange(len(line)):
 		if line[i].startswith('%'): # 레지스터라면.. 그냥 넘겨라
 			continue
+		elif len(line[i]) == 0: # 쓸모없는거라면 넘겨라
+			continue
+
 		else:
 			line[i] = line[i].replace('0x','')
 			line[i] = line[i].replace('*', '')
-			line[i] = line[i].replace('$', '')
-			if ishex(line[i]):
-				addrlist.append(int('0x'+line[i],16))
+			line[i] = line[i].replace('$', '') 
+			if line[i] == '': # 전처리 후 나온 line 이 '' 이라면 패스 
+				continue 
+			if line[i][0] == '-': # 음수라면
+				if len(line[i])>1 and ishex(line[i][1:]): # 그게 헥스값이라면 
+					addrlist.append(-int('0x'+line[i][1:],16))	
+
+			else: # 양수라면 
+				if ishex(line[i]): 
+					addrlist.append(int('0x'+line[i],16)) 
+			
 	return addrlist
 
 def parseline(line, type): 
@@ -73,7 +106,12 @@ def parseline(line, type):
 				l_data = " " + ".byte" + " " + "0x" + l2[i]
 				# l_mach += chr(int('0x'+l2[i],16))
 				l_mach += '0x' + l2[i] + " "
-				dic_data[addr_encreasing] = ['',l_data,'#=> 0x'+l2[i]] # 딕셔너리에 쌍 추가
+				dic_data[addr_encreasing] = ['',
+											l_data,
+											'#=> ' + 'ADDR:' + str(hex(addr_encreasing)) + ' BYTE:'+ '0x'+l2[i],
+											'',
+											''
+											] # 딕셔너리에 쌍 추가
 				addr_encreasing = addr_encreasing + 1
 			else:
 				stop = 1
@@ -182,6 +220,10 @@ def gen_assemblescript(filename):
 	as -o dash_reassemblable.o dash_reassemblable.s
 	ld -o dash_reassemblable -dynamic-linker /lib/ld-linux.so.2  /usr/lib/i386-linux-gnu/crti.o -lc dash_reassemblable.o /usr/lib/i386-linux-gnu/crtn.o
 	'''
+
+	cmd = 'ldd ' + filename
+	res = subprocess.check_output(cmd, shell=True)
+
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
 	cmd += "as -o "
@@ -190,8 +232,15 @@ def gen_assemblescript(filename):
 	cmd += "\n"
 	cmd += "ld -o "
 	cmd += onlyfilename + "_reassemblable "
-	cmd += "-dynamic-linker /lib/ld-linux.so.2  /usr/lib/i386-linux-gnu/crti.o "
+	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
 	cmd += "-lc "
+
+	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
+	for i in xrange(len(libraries)):
+		if "=>" in libraries[i]:
+			cmd += libraries[i].split(' ')[2]
+			cmd += " "	
+
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
 	
@@ -203,6 +252,41 @@ def gen_assemblescript(filename):
 	cmd = "chmod +x " + onlyfilename + "_assemble.sh"
 	os.system(cmd)
 	
+def gen_assemblescript_for_sharedlibrary(filename):
+	cmd = 'ldd ' + filename
+	res = subprocess.check_output(cmd, shell=True)
+
+	onlyfilename = filename.split('/')[-1]
+	cmd  = ""
+	cmd += "as -o "
+	cmd += onlyfilename + "_reassemblable.o "
+	cmd += onlyfilename + "_reassemblable.s"
+	cmd += "\n"
+
+	cmd += "ld -shared -soname "
+	cmd += get_soname(filename)
+	cmd += " -o " 
+	cmd += onlyfilename + "_reassemblable "
+	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
+	cmd += "-lc "
+
+	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
+	for i in xrange(len(libraries)):
+		if "=>" in libraries[i]:
+			cmd += libraries[i].split(' ')[2]
+			cmd += " "	
+
+	cmd += onlyfilename + "_reassemblable.o "
+	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
+	
+	
+	f = open(onlyfilename + "_assemble_library.sh", 'w')
+	f.write(cmd)
+	f.close()
+	
+	cmd = "chmod +x " + onlyfilename + "_assemble_library.sh"
+	os.system(cmd)
+
 def gen_compilescript(filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
@@ -235,20 +319,30 @@ def gen_compilescript(filename):
 	cmd = "chmod +x " + onlyfilename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblyfile(resdic, filename):
+def gen_assemblyfile(resdic, filename, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 	f = open(onlyfilename + "_reassemblable.s",'w')
 	# f.write(".global main\n")
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
-	writesection = ['.text','.data','.rodata','.bss','.init']
+	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
+
 	for sectionName in resdic.keys():
-		if sectionName in writesection:
+		if sectionName in AllSections_WRITE:
 			f.write("\n"+".section "+sectionName+"\n")
 			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔
+			if sectionName == '.init': f.write('_init: \n') # URGENT: 이거 심볼이름을 dynamic_symbolize_codesection 에서 심볼라이즈 해주므로  
+			elif sectionName == '.fini': f.write('_fini: \n')
+
+			if comment == 1: 
+				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..
+				RANGES = 3 #3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 어셈블도 안될텐데.
+			else:
+				RANGES = 2
 			for address in sorted(resdic[sectionName].iterkeys()): #정렬
-				for i in range(0,len(resdic[sectionName][address])): # TODO
-				#for i in xrange(2):
-					if len(resdic[sectionName][address][i]) > 0:
+				#for i in range(0,len(resdic[sectionName][address])): # 주석까지 프린트 하려면 활성화 해주길..
+				for i in xrange(RANGES):
+					#if len(resdic[sectionName][address]) >= RANGES: # 길이측정은 안해도될듯?
+					if len(resdic[sectionName][address][i]) > 0: # 그냥 엔터만 아니면 됨 
 						f.write(resdic[sectionName][address][i]+"\n")
 	f.close()

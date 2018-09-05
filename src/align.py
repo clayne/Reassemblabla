@@ -9,7 +9,7 @@ import subprocess
 import re
 from optparse import OptionParser
 import binascii 
-
+from global_variables import *
 
 def get_alignmentbyte(addr, type):
 	if type == 'data': # 데이터는 16 byte(SSE instruction),32 byte(AVX instruction), 64(AVX_512, intel의 특정 cpu line에서만 적용됨) 세 종류의 align
@@ -72,7 +72,7 @@ def align_data(dics_of_data): # 데이터섹션에서, 만약에 Symbol이 있�
 			align = get_alignmentbyte(key,'data')
 			if align != 0:
 				# 위의 데이터 (이전데이터) 다음에 .align 을 붙인다.
-				key_bk = sorted_keylist[i-1]
-				dics_of_data.update({key_bk:[dics_of_data[key_bk][0], dics_of_data[key_bk][1] + "\n" + ".align " + str(align)]})
-				# print "{} : {}.. align : {}".format(hex(key),dics_of_data[key], align)
+				ADDR_back = sorted_keylist[i-1]
+				dics_of_data[ADDR_back][1] = dics_of_data[ADDR_back][1] + "\n" + ".align " + str(align)
+				# dics_of_data.update({ADDR_back:[dics_of_data[ADDR_back][0], dics_of_data[ADDR_back][1] + "\n" + ".align " + str(align)]})
 	return dics_of_data
