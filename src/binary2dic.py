@@ -182,11 +182,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 	_sendaddr = _sbaseaddr + _ssize
 	while _sbaseaddr + _offset < _sendaddr: # 베이스어드레스도 바뀌고 오프셋도 바뀜
 		_errorcode = 'default' # errorcode init
-		
 		DISASM = cs.disasm(_scontents, _sbaseaddr)
-
-
-
 
 		for i in DISASM: 
 			#[DISP-A] MODR/M BIT HANDLING
@@ -480,8 +476,7 @@ def binarycode2dic(filename, SHTABLE):
 	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
 
-# TODO: bss 뿐만이 아니라 .text, .fini, .init, emdemddp 등등에 대한 심볼들도 만들어주기 
-def get_dynsymtab(filename): # 이게 제대로 동작을 안함? 아니 하는데.... 그니까 suppressint 참조코드가 잘 생기지... 
+def get_dynsymtab(filename): 
 	'''
 	- usage)
 		input : binary name
@@ -499,9 +494,6 @@ def get_dynsymtab(filename): # 이게 제대로 동작을 안함? 아니 하는�
 			if 'g' in l[1]: # global symbol 만 취급합니더,,,ㅋㅋ
 				if l[3] not in symtab.keys(): symtab[l[3]] = {} # init
 				symtab[l[3]][int('0x'+l[0], 16)] = l[6]
-	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 	for sname in symtab.keys():
 		for addr in symtab[sname].keys():
 			print "{} : {}".format(addr, symtab[sname][addr])
@@ -524,7 +516,7 @@ def get_reldyn(filename):
 	'''
 	LN_start = 0
 	LN_end   = 0
-	cmd = 'readelf -a ' + filename
+	cmd = 'readelf -a --wide ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 	lines = res.splitlines() 
 	for i in xrange(len(lines)):
@@ -555,7 +547,7 @@ def get_relplt(filename):
 	LN_start = 0
 	LN_end   = 0
 	
-	cmd = 'readelf -a ' + filename
+	cmd = 'readelf -a --wide ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 	lines = res.splitlines() 
 	for i in xrange(len(lines)):
@@ -567,7 +559,7 @@ def get_relplt(filename):
 					break
 			break
 	lines = lines[LN_start:LN_end] 
-	reldyn = {}
+	relplt = {}
 
 	for i in xrange(len(lines)):
 		lines[i] = re.sub('\s+',' ',lines[i]).strip() # duplicate space, tab --> single space
@@ -578,9 +570,9 @@ def get_relplt(filename):
 			offset = int('0x'+offset,16)
 			if '@' in name: # "getpwnam@GLIBC_2.0" 에서 이름만 파싱
 				name = name[:name.index('@')]
-				reldyn.update({offset:name})
+				relplt.update({offset:name})
 	
-	return reldyn
+	return relplt
 
 
 

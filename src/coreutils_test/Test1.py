@@ -19,7 +19,8 @@ from symbolize import *
 from global_variables import *
 import stat
 
-# python tmp.py ~/coreutils/src/
+# 설명 : 모든 [PATH] 의 실행바이너리들에 대해서 리어셈블라블라를 돌리고, 그 결과를 ./folder 에 저장합니다. 
+# Usage : python Test1.py ~/coreutils/src/
 
 def get_binary_file(mypath):
 	filelist = []
@@ -32,7 +33,7 @@ def get_binary_file(mypath):
 
 # main
 if len(sys.argv) != 2:
-	print "[*] Usage : tmp.py [PATH of coreutils binary]"
+	print "[*] Usage : Test1.py [PATH of coreutils binary]"
 	sys.exit(1)
 mypath = sys.argv[1]
 

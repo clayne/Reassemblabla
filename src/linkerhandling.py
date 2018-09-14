@@ -63,10 +63,9 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 			BASE_GOTADDR = sorted(resdic['.got'])[0]
 		else:
 			BASE_GOTADDR = sorted(resdic['.got.plt'])[0] # 왠지는 모르겠는데, 아무튼 PIE 바이너리에서는 "어쩌구"+ ".got.plt"의 시작주소 가 key가된다.
-											  # TODO : 만약에 relro 가 적용되있으면, 이것도 마찬가지로 테이블이름이 got.plt 가 아니라 미묘하게 달를수도??? 
+											             # TODO : 만약에 relro 가 적용되있으면, 이것도 마찬가지로 테이블이름이 got.plt 가 아니라 미묘하게 달를수도??? 
 	else:
 		BASE_GOTADDR = 0
-	
 	
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
@@ -98,6 +97,51 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 									print HEXVALUES[j]
 						
 					
-					
-	return resdic #TODO: 이거없애도되는듯?
 	
+
+def please_call_my_name___by_weaksymbol(dics_of_text):
+	'''
+	001b3b04  w   DO .bss  00000004  GLIBC_2.0   daylight
+	001b38b0  w   DO .bss  00000004  GLIBC_2.0   __free_hook
+	001b3dbc  w   DO .bss  00000004  GLIBC_2.0   _environ
+	001b3dcc  w   DO .bss  00000004  GLIBC_2.0   ___brk_addr
+	001b3dbc  w   DO .bss  00000004  GLIBC_2.0   environ
+	001b3b00  w   DO .bss  00000004  GLIBC_2.0   timezone
+	001b38b4  w   DO .bss  00000004  GLIBC_2.0   __malloc_initialize_hook
+	001b38ac  w   DO .bss  00000004  GLIBC_2.0   __after_morecore_hook
+	00159988  w   DO .rodata  00000010  GLIBC_2.1   in6addr_any
+	00159978  w   DO .rodata  00000010  GLIBC_2.1   in6addr_loopback
+	001b2be8  w   DO .data  00000004  GLIBC_2.0   program_invocation_name
+	001b2bdc  w   DO .data  00000008  GLIBC_2.0   tzname
+	001b2768  w   DO .data  00000004  GLIBC_2.0   __malloc_hook
+	001b2764  w   DO .data  00000004  GLIBC_2.0   __realloc_hook
+	001b2be4  w   DO .data  00000004  GLIBC_2.0   program_invocation_short_name
+	001b2760  w   DO .data  00000004  GLIBC_2.0   __memalign_hook
+	'''
+	# 주석처리 된것은 weakalias.txt와 strongalias.txt 둘다에서 없는 alias들임 ㅜㅜ
+	weak_symbols = {
+					'__daylight':'daylight', 
+					#'':'__free_hook',
+					'__environ':'_environ',
+					'__curbrk':'___brk_addr',
+					'__environ':'environ',
+					'__timezone':'timezone',
+					#'':'__malloc_initialize_hook',
+					#'':'__after_morecore_hook',
+					'__in6addr_any':'in6addr_any',
+					'__in6addr_loopback':'in6addr_loopback',
+					'__progname_full':'program_invocation_name',
+					'__tzname':'tzname',
+					#'':'__malloc_hook',
+					#'':'__realloc_hook',
+					'__progname':'program_invocation_short_name',
+					#'':'__memalign_hook'
+					}
+
+	for ADDRESS in dics_of_text.keys():
+		for realname in weak_symbols.keys():
+			if realname in dics_of_text[ADDRESS][1]:
+				dics_of_text[ADDRESS][1] = dics_of_text[ADDRESS][1].replace(realname, weak_symbols[realname])
+
+
+

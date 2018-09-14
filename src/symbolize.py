@@ -13,13 +13,8 @@ import binascii
 from etc import *
 from global_variables import *
 
-def global_symbolize_bss(dics_of_bss, symtab_bss):
-	for i in range(0, len(symtab_bss.keys())):
-		if symtab_bss.keys()[i] in dics_of_bss.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
-			dics_of_bss[symtab_bss.keys()[i]][0] = symtab_bss.values()[i]+":"
-	return dics_of_bss
 
-def global_symbolize_codesection(dics_of_000, symtab_000): #URGENT: 이거 global_symbolize_bss 랑 똑같으니깐 합쳐버려도 됨. 
+def global_symbolize_000section(dics_of_000, symtab_000):
 	for i in range(0, len(symtab_000.keys())):
 		if symtab_000.keys()[i] in dics_of_000.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
 			dics_of_000[symtab_000.keys()[i]][0] = symtab_000.values()[i]+":"

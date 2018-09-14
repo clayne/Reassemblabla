@@ -205,7 +205,7 @@ def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 �
 	f.close()
 	return SHTABLE
 	
-def gen_assemblescript(filename):
+def gen_assemblescript(LOC, filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
 		linux-gate.so.1 =>  (0xf774f000)
@@ -244,15 +244,49 @@ def gen_assemblescript(filename):
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
 	
+	saved_filename = LOC + '/' + onlyfilename
 	
-	f = open(onlyfilename + "_assemble.sh", 'w')
+	f = open(saved_filename + "_assemble.sh", 'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + onlyfilename + "_assemble.sh"
+	cmd = "chmod +x " + saved_filename + "_assemble.sh"
 	os.system(cmd)
+
+def gen_assemblescript_for_piebinary(LOC, filename):
+	cmd = 'ldd ' + filename
+	res = subprocess.check_output(cmd, shell=True)
+
+	onlyfilename = filename.split('/')[-1]
+	cmd  = ""
+	cmd += "as -o "
+	cmd += onlyfilename + "_reassemblable.o "
+	cmd += onlyfilename + "_reassemblable.s"
+	cmd += "\n"
+	cmd += "ld -pie -o "
+	cmd += onlyfilename + "_reassemblable "
+	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
+	cmd += "-lc "
+
+	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
+	for i in xrange(len(libraries)):
+		if "=>" in libraries[i]:
+			cmd += libraries[i].split(' ')[2]
+			cmd += " "	
+
+	cmd += onlyfilename + "_reassemblable.o "
+	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
 	
-def gen_assemblescript_for_sharedlibrary(filename):
+	saved_filename = LOC + '/' + onlyfilename
+
+	f = open(saved_filename + "_assemble_pie.sh", 'w')
+	f.write(cmd)
+	f.close()
+	
+	cmd = "chmod +x " + saved_filename + "_assemble_pie.sh"
+	os.system(cmd)
+
+def gen_assemblescript_for_sharedlibrary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 
@@ -279,15 +313,16 @@ def gen_assemblescript_for_sharedlibrary(filename):
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
 	
-	
-	f = open(onlyfilename + "_assemble_library.sh", 'w')
+	saved_filename = LOC + '/' + onlyfilename
+
+	f = open(saved_filename + "_assemble_library.sh", 'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + onlyfilename + "_assemble_library.sh"
+	cmd = "chmod +x " + saved_filename + "_assemble_library.sh"
 	os.system(cmd)
 
-def gen_compilescript(filename):
+def gen_compilescript(LOC, filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
 		linux-gate.so.1 =>  (0xf774f000)
@@ -312,16 +347,21 @@ def gen_compilescript(filename):
 			cmd += lines[i].split(' ')[2]
 			cmd += " "
 
-	f = open(onlyfilename + "_compile.sh",'w')
+	saved_filename = LOC + '/' + onlyfilename
+
+	f = open(saved_filename + "_compile.sh",'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + onlyfilename + "_compile.sh"
+	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblyfile(resdic, filename, symtab, comment):
+def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
-	f = open(onlyfilename + "_reassemblable.s",'w')
+
+	saved_filename = LOC + '/' + onlyfilename
+
+	f = open(saved_filename + "_reassemblable.s",'w')
 
 	# 다이나믹 글로벌 심볼들을 붙여준다. 
 	for sectionName in symtab.keys():
@@ -345,8 +385,6 @@ def gen_assemblyfile(resdic, filename, symtab, comment):
 		if sectionName in AllSections_WRITE:
 			f.write("\n"+".section "+sectionName+"\n")
 			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔
-			if sectionName == '.init': f.write('_init: \n') # URGENT: 이거 심볼이름을 dynamic_symbolize_codesection 에서 심볼라이즈 해주므로  
-			elif sectionName == '.fini': f.write('_fini: \n')
 
 			if comment == 1: 
 				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..

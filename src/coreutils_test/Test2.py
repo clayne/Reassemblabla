@@ -19,7 +19,10 @@ from symbolize import *
 from global_variables import *
 import stat
 
-# python tmp_assemble_coreutils_and_moveit_to_coreutils_src.py ~/coreutils/src/ /home/osboxes/coreutils/src
+# python Test2.py ~/coreutils/src/ /home/osboxes/coreutils/src
+# 설명 : [PATH1]에 위치한 리어셈블리 파일을 어셈블합니다.
+#        그리고나서 [PATH2] 에다가 cp 해둡니다. 
+# 이 스크립트를 마치고 나서는 그 폴더로 가서 make check 해주면 됩니다. 
 
 def get_binary_file(mypath):
 	filelist = []
@@ -33,7 +36,7 @@ def get_binary_file(mypath):
 
 # main
 if len(sys.argv) != 3:
-	print "[*] Usage : tmp.py [PATH of reassembly files] [absolute PATH of coreutils/src]"
+	print "[*] Usage : Test2.py [PATH of reassembly files] [absolute PATH of coreutils/src]"
 	sys.exit(1)
 frompath = sys.argv[1]
 destpath = sys.argv[2]
