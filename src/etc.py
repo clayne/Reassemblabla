@@ -204,7 +204,8 @@ def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 �
 		SHTABLE[section.name]  = entry
 	f.close()
 	return SHTABLE
-	
+
+
 def gen_assemblescript(LOC, filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
@@ -226,7 +227,7 @@ def gen_assemblescript(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
-	cmd += "as -o "
+	cmd += "as -g -o " # COMMENT: 디버깅할때 편리함을위해서 -g 옵션을 추가함 
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += onlyfilename + "_reassemblable.s"
 	cmd += "\n"
@@ -242,10 +243,10 @@ def gen_assemblescript(LOC, filename):
 			cmd += " "	
 
 	cmd += onlyfilename + "_reassemblable.o "
-	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
+	cmd += crts
 	
 	saved_filename = LOC + '/' + onlyfilename
-	
+
 	f = open(saved_filename + "_assemble.sh", 'w')
 	f.write(cmd)
 	f.close()
@@ -259,7 +260,7 @@ def gen_assemblescript_for_piebinary(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
-	cmd += "as -o "
+	cmd += "as -g -o "
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += onlyfilename + "_reassemblable.s"
 	cmd += "\n"
@@ -275,7 +276,7 @@ def gen_assemblescript_for_piebinary(LOC, filename):
 			cmd += " "	
 
 	cmd += onlyfilename + "_reassemblable.o "
-	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
+	cmd += crts
 	
 	saved_filename = LOC + '/' + onlyfilename
 
@@ -292,7 +293,7 @@ def gen_assemblescript_for_sharedlibrary(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
-	cmd += "as -o "
+	cmd += "as -g -o "
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += onlyfilename + "_reassemblable.s"
 	cmd += "\n"
@@ -311,7 +312,7 @@ def gen_assemblescript_for_sharedlibrary(LOC, filename):
 			cmd += " "	
 
 	cmd += onlyfilename + "_reassemblable.o "
-	cmd += "/usr/lib/i386-linux-gnu/crtn.o"
+	cmd += crts
 	
 	saved_filename = LOC + '/' + onlyfilename
 
@@ -374,12 +375,24 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 		 .global ysum
 		 .type ysum, @function 
 		 이건데
-		 _init, _fini 도 이렇게 해줘도 동작에 문제가 없나?  ㅇㅇ 문제없음. 
+		 _init, _fini 도 이렇게 해줘도 동작에 문제가 없나?  ㅇㅇ 문제없음. --> COMMENT: 문제있음. objdump -T 에 _init이 안나오는 경우가 있음. 대신 objdump -t에 _init이 나오는 경우가 있는데 지금은 머리아프니까 나중에 해결고고싱
 		'''
+
+	# COMMENT: https://stackoverflow.com/questions/52367611/can-i-link-library-except-specific-symbol  이거보고 추가함 개쩐다...
+	f.write(".section .rodata\n")
+	f.write(".globl _IO_stdin_used\n")
+	f.write(".type _IO_stdin_used, @object\n")
+	f.write(".align 4\n")
+	f.write("_IO_stdin_used:\n")
+	f.write(" .int 0x20001\n")
+	f.write(" .size _IO_stdin_used, 4\n")
+
 
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
+
+
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:

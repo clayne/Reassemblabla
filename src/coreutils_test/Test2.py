@@ -19,7 +19,7 @@ from symbolize import *
 from global_variables import *
 import stat
 
-# python Test2.py ~/coreutils/src/ /home/osboxes/coreutils/src
+# python Test2.py  ./folder  /home/osboxes/coreutils/src
 # 설명 : [PATH1]에 위치한 리어셈블리 파일을 어셈블합니다.
 #        그리고나서 [PATH2] 에다가 cp 해둡니다. 
 # 이 스크립트를 마치고 나서는 그 폴더로 가서 make check 해주면 됩니다. 
