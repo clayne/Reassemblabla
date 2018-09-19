@@ -69,8 +69,6 @@ if __name__=="__main__":
 
 
 
-	entrypointaddr = findenytypoint(options.filename)
-	resdic['.text'][entrypointaddr][0] = "_start:"
 	
 
 
@@ -81,6 +79,17 @@ if __name__=="__main__":
 	RELO_TABLES['.rel.dyn'] = get_reldyn(options.filename)
 	RELO_TABLES['.rel.plt'] = get_relplt(options.filename)
 	lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES)
+
+
+
+
+	
+	# entrypointaddr = findenytypoint(options.filename)
+	mainaddr = findmain(options.filename, resdic['.text'])
+	print mainaddr
+	resdic['.text'][mainaddr][0] = "main:"
+
+
 
 
 	

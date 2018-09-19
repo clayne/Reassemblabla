@@ -142,28 +142,16 @@ def findmain(file_name, dics_of_text):
 	'''
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
 	print "entrypoint is : {}".format(entrypoint)
-	findentry = 0
-	line = []
-	line_before = []
+	i = 0
+	befoline = 'dummy line 000'
 	for key in sorted(dics_of_text.iterkeys()):
-		line_before  = line # 이전라인을 백업해두고나서
-		line = dics_of_text[key] # 새로운 value를 받아들인다
-		if findentry is 1:
-			if "__libc_start_main" in line[1]: # line = ['','pop ret 어쩌구']
-				break # 그만찾으셈
-			else:
-				continue # 아래라인으로 내려가지않도록
-		if key == entrypoint: 
-			findentry = 1
-	'''
-	$ 으로시작하도록 push하니깐 그냥그값만 긁어온다
-	8048357:	68 3b 84 04 08       	push   $0x804843b
-	804835c:	e8 bf ff ff ff       	call   8048320 <__libc_start_main@plt>
-	'''
-	l = line_before[1].split(' ')
-	for i in range(0,len(l)):
-		if l[i].startswith('$'):
-			return int(l[i][1:],16)
+		thisline = dics_of_text[key][1]
+		if '__libc_start_main' in thisline: 
+			main = extract_hex_addr(befoline)[0]
+			break
+		befoline = thisline
+	return main
+
 
 def findenytypoint(file_name):
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
@@ -231,7 +219,7 @@ def gen_assemblescript(LOC, filename):
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += onlyfilename + "_reassemblable.s"
 	cmd += "\n"
-	cmd += "ld -o "
+	cmd += "ld --entry=MYSTART -o "
 	cmd += onlyfilename + "_reassemblable "
 	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
 	cmd += "-lc "
@@ -254,6 +242,7 @@ def gen_assemblescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_assemble.sh"
 	os.system(cmd)
 
+# TODO: pie 바이너리에도 --entry=MYSTART  적용가능한가 인스펙트해보고 적용하기 
 def gen_assemblescript_for_piebinary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
@@ -287,6 +276,7 @@ def gen_assemblescript_for_piebinary(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_assemble_pie.sh"
 	os.system(cmd)
 
+# TODO: 라이브러리에도 --entry=MYSTART  적용가능한가 인스펙트해보고 적용하기 
 def gen_assemblescript_for_sharedlibrary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
@@ -323,6 +313,7 @@ def gen_assemblescript_for_sharedlibrary(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_assemble_library.sh"
 	os.system(cmd)
 
+# TODO: 컴파일스크립트에도 --entry=MYSTART  적용가능한지... 혹은 그냥 이 함수 날려버려도 될듯? 안쓸것같은데. 
 def gen_compilescript(LOC, filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
@@ -379,6 +370,7 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 		'''
 
 	# COMMENT: https://stackoverflow.com/questions/52367611/can-i-link-library-except-specific-symbol  이거보고 추가함 개쩐다...
+	'''
 	f.write(".section .rodata\n")
 	f.write(".globl _IO_stdin_used\n")
 	f.write(".type _IO_stdin_used, @object\n")
@@ -386,9 +378,22 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 	f.write("_IO_stdin_used:\n")
 	f.write(" .int 0x20001\n")
 	f.write(" .size _IO_stdin_used, 4\n")
+	'''
 
-
-	f.write(".global _start\n")
+	# COMMENT: https://stackoverflow.com/questions/52367611/can-i-link-library-except-specific-symbol 
+	# "I mean, if you need some kind of "main", then you can reuse it straight away, if you don't need main, then you can provide empty function (but then I'm not sure, if the crt1 will not run main + get exit from main + de-initialize everything... "
+	# crt1.o... 너를위해 준비햇서,,,ㅎ
+	# f.write(".global __libc_csu_fini\n")
+	# f.write(".global __libc_csu_init\n")
+	f.write(".global main\n")
+	# f.write(".global MYSTART\n")
+	# f.write("__libc_csu_fini:\n")
+	# f.write(" ret\n")
+	# f.write("__libc_csu_init:\n")
+	# f.write(" ret\n")
+	# f.write("main:\n")
+	# f.write(" ret\n")
+	# f.write(".global _start\n") 
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
 
@@ -396,9 +401,18 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
-			f.write("\n"+".section "+sectionName+"\n")
-			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔
+			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors']
+			SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
+			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
+				f.write("\n" + ".section " + ".text" + "\n")
+			elif sectionName in SectionThatLoaderAutomaticallyAdds_data:
+				f.write("\n" + ".section " + ".data" + "\n")
+			else:
+				f.write("\n"+".section "+sectionName+"\n")
 
+
+
+			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 			if comment == 1: 
 				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..
 				RANGES = 3 #3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 어셈블도 안될텐데.

@@ -17,7 +17,11 @@ from global_variables import *
 def global_symbolize_000section(dics_of_000, symtab_000):
 	for i in range(0, len(symtab_000.keys())):
 		if symtab_000.keys()[i] in dics_of_000.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
-			dics_of_000[symtab_000.keys()[i]][0] = symtab_000.values()[i]+":"
+			# COMMENT: _init, _fini 는 crti.o 에 이미 정의되어있다고하면서 링커에러남. 어차피  원래있던 _init은 안쓸거기도하고. 심볼이름이 그닥중요하진않으니까 심볼이름바꿔서 심볼라이즈 ㄱㄱ
+			if symtab_000.values()[i] == '_init' or symtab_000.values()[i] == '_fini':
+				dics_of_000[symtab_000.keys()[i]][0] = 'MY_' + symtab_000.values()[i]+":"
+			else:
+				dics_of_000[symtab_000.keys()[i]][0] = symtab_000.values()[i]+":"
 	return dics_of_000
 
 def not_global_symbolize_bss(dics_of_bss, symtab_bss):
