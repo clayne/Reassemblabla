@@ -139,8 +139,6 @@ def BUG_B_HANDLING(OPCODE, OPCODE_inside_ModRM_byte):
 
 	return MY_mnemoonic
 
-
-
 def bugB(i_op_str):
 	digit = i_op_str.split(', ')[0] # $0xf0
 	digit = digit[1:]               # 0xf0
@@ -168,7 +166,6 @@ def KEYSTONE_asm(CODE):
 	return RET
 
 def disasm_capstone(_scontents, _sbaseaddr, _ssize):
-	print "disasm_capstone"
 	cs = Cs(CS_ARCH_X86, CS_MODE_32)
 	cs.detail = True   
 	cs.syntax = CS_OPT_SYNTAX_ATT # CS_OPT_SYNTAX_NASM, CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT
@@ -349,33 +346,34 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					"DEFFERENT because capstone cannot understans 'long' suffix... "
 				else:
 					if ORIG_ASSEMBLY != RE___ASSEMBLY:
-						print "-----[LOG] DIFFERENT BETWEEN BINARY AND RE-ASSEMBLY-----"
-						print "* DISASM   : " + DISASSEMBLY_for_reassemble
-						print "* ORIG     : " + ORIG_ASSEMBLY
-						print "* KEYSTONE : " + RE___ASSEMBLY
-						print "-------------------------------------------------------"
+						"disabled"
+						# p_rint "-----[LOG] DIFFERENT BETWEEN BINARY AND RE-ASSEMBLY-----"
+						# p_rint "* DISASM   : " + DISASSEMBLY_for_reassemble
+						# p_rint "* ORIG     : " + ORIG_ASSEMBLY
+						# p_rint "* KEYSTONE : " + RE___ASSEMBLY
+						# p_rint "-------------------------------------------------------"
 				DISASSEMBLY_for_reassemble = '' # init
 				MY_op_str = ''   # init
 				MY_mnemoonic = '' # init
 
-				# print "============================================="
-				# print "mnemonic     : {}".format(i.mnemonic)   
-				# print "op_str       : {}".format(i.op_str)   
-				# print 
-				# print "groups       : {}".format(i.groups)    
-				# print "regs_read    : {}".format(i.regs_read)   
-				# print "regs_write   : {}".format(i.regs_write)
-				# print 
-				# print "inst ID      : {}".format(i.id)   # instruction ID 
-				# print "size         : {}".format(i.size) # length of instruction
-				# print "prefix       : {}".format(i.prefix)
-				# print "opcode       : {}".format(i.opcode)
-				# print "addr_size    : {}".format(i.addr_size)
-				# print "modrm        : {}".format(i.modrm)
-				# print "disp         : {}".format(i.disp)
-				# print "sib          : {}".format(i.sib)
-				# print "instruction  : {}".format(binascii.hexlify(i.bytes)) # real byte of instruction
-				# print ""
+				# p_rint "============================================="
+				# p_rint "mnemonic     : {}".format(i.mnemonic)   
+				# p_rint "op_str       : {}".format(i.op_str)   
+				# p_rint 
+				# p_rint "groups       : {}".format(i.groups)    
+				# p_rint "regs_read    : {}".format(i.regs_read)   
+				# p_rint "regs_write   : {}".format(i.regs_write)
+				# p_rint 
+				# p_rint "inst ID      : {}".format(i.id)   # instruction ID 
+				# p_rint "size         : {}".format(i.size) # length of instruction
+				# p_rint "prefix       : {}".format(i.prefix)
+				# p_rint "opcode       : {}".format(i.opcode)
+				# p_rint "addr_size    : {}".format(i.addr_size)
+				# p_rint "modrm        : {}".format(i.modrm)
+				# p_rint "disp         : {}".format(i.disp)
+				# p_rint "sib          : {}".format(i.sib)
+				# p_rint "instruction  : {}".format(binascii.hexlify(i.bytes)) # real byte of instruction
+				# p_rint ""
 				
 				
 				
@@ -412,15 +410,14 @@ def binarydata2dic(filename):
 	f = open(filename,'r')
 	binfile = f.read()
 	
-	data_section = DataSections_IN_resdic
-	data_section.remove('.bss') # bss섹션은 zero fill on demend 로 채워줄 것이기 때문임
+	for SectionName in DataSections_IN_resdic:
+		if SectionName == '.bss': # bss 는 초기화되면서 0으로 채워질것이기 때문에 데이터를 굳이 때려박지 않아도 된다고 함...
+			continue
+		if bin.get_section_by_name(SectionName) != None: # 섹션이 있는지 검사
 
-	for SECTIONNAME in data_section:
-		if bin.get_section_by_name(SECTIONNAME) != None: # 섹션이 있는지 검사
-
-			s_start = bin.get_section_by_name(SECTIONNAME).header.sh_addr
-			s_offset = bin.get_section_by_name(SECTIONNAME).header.sh_offset
-			s_size = bin.get_section_by_name(SECTIONNAME).header.sh_size
+			s_start = bin.get_section_by_name(SectionName).header.sh_addr
+			s_offset = bin.get_section_by_name(SectionName).header.sh_offset
+			s_size = bin.get_section_by_name(SectionName).header.sh_size
 			s_contents = binfile[s_offset:s_offset+s_size]
 			datadic = {} # initialize
 			for j in xrange(s_size):
@@ -434,7 +431,7 @@ def binarydata2dic(filename):
 								'',
 								''
 								]
-			retdic[SECTIONNAME] = datadic
+			retdic[SectionName] = datadic
 
 	# zero-fill-on-demand
 	zeroinit_section = ['.bss']
@@ -476,13 +473,13 @@ def binarycode2dic(filename, SHTABLE):
 	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
 
+# TODO: 이 함수는 곧 readelf 함수와 통합됩니다.. readelf -a 의 .dynsym 섹션이거등요. 그럼 수고. 
 def get_dynsymtab(filename): 
 	'''
 	- usage)
 		input : binary name
 		output : dict {address:symbolname, ...}
 	'''
-	print "get_dynsymtab"
 	cmd = 'objdump -T '+filename
 	res = subprocess.check_output(cmd, shell=True)
 	lines = res.splitlines() 
@@ -494,85 +491,84 @@ def get_dynsymtab(filename):
 			if 'g' in l[1]: # global symbol 만 취급합니더,,,ㅋㅋ
 				if l[3] not in symtab.keys(): symtab[l[3]] = {} # init
 				symtab[l[3]][int('0x'+l[0], 16)] = l[6]
-	for sname in symtab.keys():
-		for addr in symtab[sname].keys():
-			print "{} : {}".format(addr, symtab[sname][addr])
 	return symtab
 
-def get_reldyn(filename):
-	'''
-	# input : 파일이름
-	# output : reldyn 섹션의 dictionary 를 리턴함 {[08049ff4:'printf']} 어쩌구... <- 참고로 Full_Relro 에서만 사용됨. 
-	'''
-	'''
-	Relocation section '.rel.dyn' at offset 0x2a0 contains 3 entries:
-	Offset     Info    Type            Sym.Value  Sym. Name
-	08049ff4  00000206 R_386_GLOB_DAT    00000000   printf@GLIBC_2.0
-	08049ff8  00000106 R_386_GLOB_DAT    00000000   __gmon_start__
-	08049ffc  00000406 R_386_GLOB_DAT    00000000   __libc_start_main@GLIBC_2.0
 
-	
-	The decoding of unwind sections for machine type Intel 80386 is not currently supported.
-	'''
-	LN_start = 0
-	LN_end   = 0
+
+# input : 파일이름
+# output : '.rel.dyn' 등 특정섹션의 readelf -a 결과를 파싱해서 리턴함['001b1edc', '00069b06', 'R_386_GLOB_DAT', '001b2be8', '__progname_full'] 
+#          참고로 reldyn은 Full_Relro 에서만 사용됨. 
+def readelf(sectionname, filename):
+	_from_no = 0
+	_to_no   = 0
+	_beforeline = 'dummy'
+
 	cmd = 'readelf -a --wide ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 	lines = res.splitlines() 
 	for i in xrange(len(lines)):
-		if 'Relocation section \'.rel.dyn\'' in lines[i]:
-			LN_start = i + 2 # line 0 (Relocation section '.rel.dyn' 어쩌구..), line 1 (Offset Info Type 어쩌구..) 제외
-			for j in xrange(LN_start, len(lines)):
-				if len(lines[j]) is 0: # '.rel.dyn' 이 끝나면
-					LN_end = j
+		if _beforeline == '':                                # 특징 1 : 맨앞에 엔터를 가짐
+			if '\'' + sectionname + '\'' in lines[i]:        # 특징 2 : 'sectionname' 을 포함하고 
+				if lines[i].endswith('entries:'):            # 특징 3 : 'entries:' 로 끝남
+					_from_no = i + 2 # line 0 (Relocation section '.rel.dyn' 어쩌구..), line 1 (Offset Info Type 어쩌구..) 제외
+					for j in xrange(_from_no, len(lines)):
+						if lines[j] == '':                   # 특징 4 : 테이블이 끝나면 또 엔터를 가짐
+							_to_no = j
+							break
 					break
-			break
-	lines = lines[LN_start:LN_end]
-	reldyn = {}
+		_beforeline = lines[i]
+	lines = lines[_from_no:_to_no]
 
+	if len(lines) < 1:
+		logging("There's no table named [" + sectionname + "]...")
+		return {}
+
+	max_column_entry_no = 0
 	for i in xrange(len(lines)):
 		lines[i] = re.sub('\s+',' ',lines[i]).strip() # duplicate space, tab --> single space
-		l_split = lines[i].split(' ')
-		if len(l_split) >= 5 : # 쓸모없는 엔트리 3개짜리 라인들을 제외 ("0002b0fc  00000008 R_386_RELATIVE")
-			offset = l_split[0] 
-			name   = l_split[4]
-			offset = int('0x'+offset,16)
-			if '@' in name: # "getpwnam@GLIBC_2.0" 에서 이름만 파싱
-				name = name[:name.index('@')]
-				reldyn.update({offset:name})
-	
-	return reldyn
-	
-def get_relplt(filename):
-	LN_start = 0
-	LN_end   = 0
-	
-	cmd = 'readelf -a --wide ' + filename
-	res = subprocess.check_output(cmd, shell=True)
-	lines = res.splitlines() 
-	for i in xrange(len(lines)):
-		if 'Relocation section \'.rel.plt\'' in lines[i]:
-			LN_start = i + 2 # line 0 (Relocation section '.rel.dyn' 어쩌구..), line 1 (Offset Info Type 어쩌구..) 제외
-			for j in xrange(LN_start, len(lines)):
-				if len(lines[j]) is 0: # '.rel.dyn' 이 끝나면
-					LN_end = j
-					break
-			break
-	lines = lines[LN_start:LN_end] 
-	relplt = {}
+		lines[i] = lines[i].split(' ')
+		
 
-	for i in xrange(len(lines)):
-		lines[i] = re.sub('\s+',' ',lines[i]).strip() # duplicate space, tab --> single space
-		l_split = lines[i].split(' ')
-		if len(l_split) >= 5 : # 쓸모없는 엔트리 3개짜리 라인들을 제외 ("0002b0fc  00000008 R_386_RELATIVE")
-			offset = l_split[0] 
-			name   = l_split[4]
-			offset = int('0x'+offset,16)
-			if '@' in name: # "getpwnam@GLIBC_2.0" 에서 이름만 파싱
-				name = name[:name.index('@')]
-				relplt.update({offset:name})
-	
-	return relplt
+		if len(lines[i]) > max_column_entry_no:
+			max_column_entry_no = len(lines[i])
+
+	i = len(lines) - 1
+	while i >= 0:
+		if len(lines[i]) < max_column_entry_no:
+			del lines[i]  # 하등 쓸모없는 엔트리 3개짜리 라인들을 제외 ("0002b0fc  00000008 R_386_RELATIVE")
+		i -= 1
+
+	return lines
+
+
+
+# ATTR_select
+# COLUMN_key
+# COLUMN_value
+# COLUMN_attr
+
+# TODO: KeyColomn 과 ValueColomn을 둘다 받도록 하자 
+def TwoColumnize(readelfEntryTableName, TABLE, ATTR_select, COLUMN_attr, COLUMN_key, COLUMN_value):
+	TwoColumnTABLE = {}
+
+	if readelfEntryTableName == 'Relocation section':
+		idx = {'Offset':0, 'Info':1, 'Type':2, 'Sym.Value':3, 'Sym. Name':4}
+	elif readelfEntryTableName == 'Symbol table':
+		idx = {'Num:':0, 'Value':1, 'Size':2, 'Type':3, 'Bind':4, 'Vis':5, 'Ndx':6, 'Name':7}
+
+	# for addr in TABLE.keys():
+	for i in xrange(len(TABLE)):
+		line = TABLE[i]
+		if line[idx[COLUMN_attr]] == ATTR_select:
+			key = int('0x' + line[idx[COLUMN_key]], 16)
+			if key != 0: # 주소값 0인것들은 하등 노쓸모이다. 
+				externalname = line[idx[COLUMN_value]]
+				if '@' in externalname:
+					externalname = externalname[:externalname.index('@')] # getpwnam@GLIBC_2.0 -> getpwnam
+				TwoColumnTABLE[key] = externalname
+
+	return TwoColumnTABLE
+
 
 
 

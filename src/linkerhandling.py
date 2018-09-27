@@ -40,51 +40,86 @@ def lfunc_remove_callweirdfunc(dics_of_text):
 # for objdump
 
 
+def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
+	# full relo    : .text -> .plt.got -> puts@GOT.
+	# partial relo : .text -> .plt     -> puts@GOT.
+
+	T_plt2name = {}
+
+	# [01] SET VIA CORRESPOND TO "RELOCATION INFO"
+	if CHECKSEC_INFO.relro == 'Full':
+		pltsection = resdic['.plt.got']
+	else:
+		pltsection = resdic['.plt']
+
+	# [02] PIE바이너리에서는 plt섹션에서 GOT가 마치 다이나믹한척함. 하지만 테이블에서 보여지는건 + _GLOBAL_OFFSET_TABLE_ 한 값이다. 참고 : https://blog.naver.com/eternalklaus/221365789660
+	_GLOBAL_OFFSET_TABLE_ = 0
+	if CHECKSEC_INFO.pie == True:
+		if CHECKSEC_INFO.relro == 'Full':
+			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'].keys())[0]
+		else:
+			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'].keys())[0]
+
+	for pltaddr in pltsection.keys():
+		gotaddr = extract_hex_addr(pltsection[pltaddr][1]) # jmp *0x8039234 에서 hex값 추출 
+		if len(gotaddr) < 1: continue # plt 섹션에 명령어에도 push 1 이런 쓸모없는것들이 있거덩... 패스해...
+
+		gotaddr = gotaddr[0]
+		gotaddr = _GLOBAL_OFFSET_TABLE_ + gotaddr
+
+		if gotaddr in T_got2name.keys():
+			T_plt2name[pltaddr] = T_got2name[gotaddr]
+
+	return T_plt2name 
+
 # full relro 인 경우에는 좀더 복잡하게 링킹을 풀어줌
 def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 	# 참고
 	'''
-	full relo    = .text -> .plt.got -> "어쩌구".   "어쩌구" 가 [.rel.dyn]의 key가된다  
-	partial relo = .text -> .plt     -> "어쩌구".   "어쩌구" 가 [.rel.plt]의 key가된다
+	full relo    : .text -> .plt.got -> puts@GOT.   GOT의위치 가 [.rel.dyn]의 key가된다  
+	partial relo : .text -> .plt     -> puts@GOT.   GOT의위치 가 [.rel.plt]의 key가된다
+	하지만 text 안에서는      === 얘의위치로써 puts 를 부른다. 
+	
+	그래서 === 를 부른다면, === 안에 jmp ??? 가 있다면,
+	???를 뽑아와서 RELO_TABLES[???] 으로 이름을 알아내는 원리이다...
 	'''
 	print "lfunc_revoc_linking"
 	
 	# [01] SET VIA CORRESPOND TO "RELOCATION INFO"
 	if CHECKSEC_INFO.relro == 'Full':
 		VIA = '.plt.got'
-		TABLE  = RELO_TABLES['.rel.dyn'] 
+		# TABLE  = RELO_TABLES['.rel.dyn'] 
 	else:
 		VIA = '.plt'
-		TABLE  = RELO_TABLES['.rel.plt']
-	
+		# TABLE  = RELO_TABLES['.rel.plt']
+	TABLE = RELO_TABLES
+
 	# [02] GET BASE ADDRESS OF GOT
 	if CHECKSEC_INFO.pie == True:
 		if CHECKSEC_INFO.relro == 'Full':
-			BASE_GOTADDR = sorted(resdic['.got'])[0]
+			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'])[0]
 		else:
-			BASE_GOTADDR = sorted(resdic['.got.plt'])[0] # 왠지는 모르겠는데, 아무튼 PIE 바이너리에서는 "어쩌구"+ ".got.plt"의 시작주소 가 key가된다.
+			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'])[0] # 왠지는 모르겠는데, 아무튼 PIE 바이너리에서는 "어쩌구"+ ".got.plt"의 시작주소 가 key가된다.
 											             # TODO : 만약에 relro 가 적용되있으면, 이것도 마찬가지로 테이블이름이 got.plt 가 아니라 미묘하게 달를수도??? 
 	else:
-		BASE_GOTADDR = 0
-	
+		_GLOBAL_OFFSET_TABLE_ = 0
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
 			for ADDRESS in resdic[SectionName].keys():
 				DISASSEMBLY = resdic[SectionName][ADDRESS][1]
-				
-				HEXVALUES = extract_hex_addr(DISASSEMBLY)
-				if len(HEXVALUES) >= 1:
-					for j in xrange(len(HEXVALUES)):
-						if HEXVALUES[j] in resdic[VIA]: # 3STEP LANDING : .text -> .plt.got -> .rel.dyn 
-							HEXFINAL = extract_hex_addr(resdic[VIA][HEXVALUES[j]][1]) # .plt.got에서 jmp *0x8049ff4 하는 대상주소
+				GOT_addr_of_func = extract_hex_addr(DISASSEMBLY)
+				if len(GOT_addr_of_func) >= 1:
+					for j in xrange(len(GOT_addr_of_func)):
+						if GOT_addr_of_func[j] in resdic[VIA].keys(): # 3STEP LANDING : .text -> .plt.got -> .rel.dyn 
+							HEXFINAL = extract_hex_addr(resdic[VIA][GOT_addr_of_func[j]][1]) # .plt.got에서 jmp *0x8049ff4 하는 대상주소
 							if len(HEXFINAL) < 1:
 								"언급된 HEX 값이 우연히 VIA 중간을 찍는 값인경우, VIA 의 disassembly가 nop(66 90)일 경우가 많다. 구럼헥스값없징."
 							else:
-								HEXFINAL[0] = HEXFINAL[0] + BASE_GOTADDR # "어쩌구" + Got base address
+								HEXFINAL[0] = HEXFINAL[0] + _GLOBAL_OFFSET_TABLE_ # "어쩌구" + Got base address
 								if HEXFINAL[0] in TABLE.keys():
 									name = TABLE[HEXFINAL[0]]  # TODO: now handling..lib_addr 가 TABLE 에 없는경우가 있음. (<= 얘 뭐라는거냐? )
-									DISASSEMBLY = DISASSEMBLY.replace(hex(HEXVALUES[j]),name)
-									DISASSEMBLY = DISASSEMBLY.replace(hex(HEXVALUES[j])[2:],name)
+									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j]),name)
+									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j])[2:],name)
 									resdic['.text'][ADDRESS][1] = DISASSEMBLY
 								else: 
 									print "==========="
@@ -93,8 +128,8 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 									print HEXFINAL[0]
 									print "disassembly"
 									print DISASSEMBLY
-									print resdic[VIA][HEXVALUES[j]][1]
-									print HEXVALUES[j]
+									print resdic[VIA][GOT_addr_of_func[j]][1]
+									print GOT_addr_of_func[j]
 						
 					
 	

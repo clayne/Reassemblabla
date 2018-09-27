@@ -14,6 +14,27 @@ from etc import *
 from global_variables import *
 
 
+def dynamic_symbol_labeling(resdic, addr2name):
+	for SectionName in resdic.keys():
+		for addr in resdic[SectionName].keys():
+			if addr in addr2name.keys():
+				symbolname = addr2name[addr]
+				if resdic[SectionName][addr][0] == '':# 심볼이 없다면, 심볼이름을 붙여준다. 심볼이 이미 있다면, 이전에 설정된 심볼을 우선적으로 선택하므로 심볼라이즈 ㄴㄴ. 
+					resdic[SectionName][addr][0] = symbolname + ':'
+
+
+# 가끔 이름없는 plt섹션이 있음. ex) __gmon_start__@plt 를 부르면, got로 점프하는데, 이 got는 라벨링이 안되있음  
+# 그러므로 라벨링되지 않은 ['.plt.got','.plt'] 섹션의 주소는 모두 XXX를 붙여준다. 
+# 그곳으로 점프하면 곧바로 ret하도록 보험처리를 해두는것임.
+def pltsection_sanitize(resdic):
+	pltsections = ['.plt.got','.plt'] 
+	for SectionName in resdic.keys():
+		if SectionName in pltsections:
+			for addr in resdic[SectionName].keys():
+				if resdic[SectionName][addr][0] == '':
+					resdic[SectionName][addr][0] = 'XXX:'
+
+
 def global_symbolize_000section(dics_of_000, symtab_000):
 	for i in range(0, len(symtab_000.keys())):
 		if symtab_000.keys()[i] in dics_of_000.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
@@ -24,14 +45,46 @@ def global_symbolize_000section(dics_of_000, symtab_000):
 				dics_of_000[symtab_000.keys()[i]][0] = symtab_000.values()[i]+":"
 	return dics_of_000
 
-def not_global_symbolize_bss(dics_of_bss, symtab_bss):
-	for i in range(0, len(symtab_bss.keys())):
-		if symtab_bss.keys()[i] in dics_of_bss.keys():
-			dics_of_bss[symtab_bss.keys()[i]][0] = "DUMMY_" + symtab_bss.values()[i]+":"
-	return dics_of_bss	
+
+
+
+def not_global_symbolize_datasection(resdic):
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "not_global_symbolize_datasection"
+	print "DataSections_WRITE : {}".format(DataSections_WRITE)
+	print "DataSections_IN_resdic : {}".format(DataSections_IN_resdic)
+
+
+	for SectionName in resdic.keys():
+		if SectionName in DataSections_IN_resdic: # 데이터 섹션이라면 
+			print SectionName
+			for addr in resdic[SectionName].keys():
+				if resdic[SectionName][addr][0] != '': # 심볼이 붙어있는데
+					if resdic[SectionName][addr][0].startswith('MYSYM_') == True:
+						"This is my symbol. :) PASS."
+					else:
+						spoiled = resdic[SectionName][addr][0]
+						if '@' in spoiled:
+							spoiled = spoiled[:spoiled.index('@')] + ':' # stderr@GOT(%ebx) 이런식으로 지어진 이름의 심볼. 즉, .got 안에 들어가 앉아있는 데이터셈볼 (RELocation Table 에서 R_386_GLOB_DAT 속성의 심볼임) 
+						
+						if SectionName == '.got': # 섹션네임이 got라면 외부에서 링킹받아와다 지금 로컬에 데이터가 있는상태다. 즉 로컬데이터가 의미있다는 거시다. 
+							continue
+
+						spoiled = 'MYSYM_' + spoiled
+						resdic[SectionName][addr][0] = spoiled
+	return resdic	
+
+
 
 def PIE_symbolize_getpcthunk(resdic):
-	print "PIE_symbolize_getpcthunk"
+	# p_rint "PIE_symbolize_getpcthunk"
+
+	pcthunk_reglist = [] # 필요할지도 모르니까, getpcthunk의 결과가 들어가는 레지스터들의 리스트들도 따로 저장해둠.ㅋ
 	code_sections = CodeSections_WRITE
 	count = 0
 	for Sname in code_sections:
@@ -51,10 +104,12 @@ def PIE_symbolize_getpcthunk(resdic):
 								AX_BX_CX = OPRAND_1[len('0(%esp), %e'):]
 							elif '(%esp), %e' in OPRAND_1:
 								AX_BX_CX = OPRAND_1[len('(%esp), %e'):]
+							
 							if DISASM_2.startswith('ret'):
 								SectionDic[SORTKEY[i]][0] = '__x86.get_pc_thunk.' + str(count) + '.' + AX_BX_CX + ':' # symbolization
 								count += 1
-	
+								pcthunk_reglist.append('e' + AX_BX_CX)
+	return 	list(set(pcthunk_reglist)) # 중복 제거
 
 
 # 1. 우선은 헥스값을 발라내고
@@ -63,7 +118,7 @@ def PIE_symbolize_getpcthunk(resdic):
 def symbolize_textsection(resdic):
 
 	_from = CodeSections_WRITE
-	_to = AllSections_WRITE
+	_to = AllSection_IN_resdic
 	
 	symbolcount = 0
 	
@@ -101,15 +156,16 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 	# 2. 있으면 그 .byte 01 .byte 04 .byte 20 .byte 80  자리에 .byte 심볼이름 을 씀. 
 	#    4byte align 맞춰가면서 symbolize 하기
 	# rodata -> data, rodata, bss
-	_from = DataSections_WRITE
-	_from.remove('.bss')     # bss에는 아무것도 안들어있자나..
-	_to = AllSections_WRITE
+	_from = DataSections_WRITE     
+	_to = AllSection_IN_resdic
 	symcnt = 0
 	for section_from in _from:
+		if _from == '.bss':# bss에는 아무것도 안들어있자나..
+			continue
 		for section_to in _to:
 			if section_from not in resdic.keys() or section_to not in resdic.keys(): # COMMENT: 예외처리 추가함 
 				continue
-			print "Symbolizing [{}] to [{}]".format(section_from,section_to)
+			# p_rint "Symbolizing [{}] to [{}]".format(section_from,section_to)
 			i = 0
 			sorted_keylist = sorted(resdic[section_from]) # key list sort
 			while i <= len(sorted_keylist) - 4: # len-4, len-3, len-2, len-1
@@ -196,16 +252,16 @@ def lfunc_change_loop_call_jmp_and_hexvalue_instruction_to_data(dics_of_text):
 					if INSTR in elements[1]:
 						yes_it_is_branch_instruction = 1
 				if yes_it_is_branch_instruction == 1: # here --> jmp 12f2
-					print "***************************************"
-					print dics_of_text[key][1]
-					print dics_of_text[key][2]
+					# p_rint "***************************************"
+					# p_rint dics_of_text[key][1]
+					# p_rint dics_of_text[key][2]
 					bytepattern = dics_of_text[key][2].split('BYTE:')[1]
 					line_data = ' .byte '
 					for j in xrange(len(bytepattern)/2):
 						line_data += '0x' + bytepattern[j*2:j*2+2] + ', '
 					line_data = line_data[:-2]
 					dics_of_text[key][1] = line_data
-					print dics_of_text[key][1]
+					# p_rint dics_of_text[key][1]
 
 
 

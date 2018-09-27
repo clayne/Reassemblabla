@@ -11,17 +11,20 @@ from optparse import OptionParser
 import binascii 
 from global_variables import *
 
+def logging(mystr):
+	print " [*] " + str(mystr)
+
 def get_soname(filename):
-    try:
-        out = subprocess.check_output(['objdump', '-p', filename])
-    except:
-        return ''
-    else:
-        result = re.search('^\s+SONAME\s+(.+)$',out,re.MULTILINE)
-        if result:
-            return result.group(1)
-        else:
-            return ''
+	try:
+		out = subprocess.check_output(['objdump', '-p', filename])
+	except:
+		return ''
+	else:
+		result = re.search('^\s+SONAME\s+(.+)$',out,re.MULTILINE)
+		if result:
+			return result.group(1)
+		else:
+			return ''
 
 def extract_register(line):
 	reglist = []
@@ -127,8 +130,9 @@ def parseline(line, type):
 		if '(bad)' in l_code: # text 안에 있는 data 라서 disassemble 이 잘 안된경우 걍 데이터로 박아버린다
 			return dic_data 
 		return dic_text 
-	
-def findmain(file_name, dics_of_text):
+
+def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
+	# call __libc_start_main 이 아니라, call 0x8108213 (0x8108213 주소의 심볼 : __libc_start_main) 이더라도 main을 리턴할수 있게만 하면되지.
 	'''
 	entry point 로부터 main 의 주소를 파싱해서 리턴
 	
@@ -140,22 +144,49 @@ def findmain(file_name, dics_of_text):
 		
 		에서 0x804840b 를 리턴한다. 
 	'''
+	dics_of_text = resdic['.text']
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
-	print "entrypoint is : {}".format(entrypoint)
 	i = 0
+	main = -1 # main 이 없다면 -1 리턴.. 
 	befoline = 'dummy line 000'
-	for key in sorted(dics_of_text.iterkeys()):
-		thisline = dics_of_text[key][1]
-		if '__libc_start_main' in thisline: 
-			main = extract_hex_addr(befoline)[0]
-			break
-		befoline = thisline
+
+	for addr in sorted(dics_of_text.iterkeys()):
+		line = dics_of_text[addr][1]
+		if len(extract_hex_addr(line)) > 0:
+			suspect = extract_hex_addr(line)[0]
+			if suspect == __libc_start_main_addr:
+				main = extract_hex_addr(befoline)[0]
+				break
+		befoline = line
+
+	# pie 바이너리에는 .got  섹션 안에 main의 위치가 있었다. 
+	# 그래서 __libc_start_main 의 바로 위칸에서 원래는 push $main 을 해야할 때,
+	# push -0xc(%ebx) 를 하는 거시였다...
+	# 그러므로 나는 휴리스틱하게 -0xc(_GLOBAL_OFFSET_TABLE_) 에 있는 주소값을 읽어다가 리턴을 해줄 거시다. 
+	if CHECKSEC_INFO.relro == 'Full':
+		_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'].keys())[0]
+	else:
+		_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'].keys())[0]
+
+
+
+	if CHECKSEC_INFO.pie == True:
+		mainaddr_is_in = _GLOBAL_OFFSET_TABLE_ + main
+		print "main *********** : {}".format(hex(mainaddr_is_in))
+		for addr in sorted(resdic['.got'].keys()):
+			if mainaddr_is_in == addr:
+				main  = ''
+				main += resdic['.got'][mainaddr_is_in+3][1]
+				main += resdic['.got'][mainaddr_is_in+2][1]
+				main += resdic['.got'][mainaddr_is_in+1][1]
+				main += resdic['.got'][mainaddr_is_in+0][1]
+				main = main.replace(' .byte 0x','')
+				main = int('0x' + main,16)
+
 	return main
 
-
-def findenytypoint(file_name):
+def findstart(file_name):
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
-	print "entrypoint is : {}".format(entrypoint)
 	return entrypoint
 	
 def remove_brackets(dics_of_text):
@@ -173,6 +204,17 @@ def remove_brackets(dics_of_text):
 			dics_of_text.values()[i][1] = line[:index1] + line[index2+1:]
 		except:
 			"dummy"
+
+def setsymbolnamefor_GLOB_DAT(T_glob):
+	for key in T_glob.keys():
+		if T_glob[key] == '__gmon_start__': # __gmon_start__ 는 일반바이너리에도 있는 GLOB_DAT이다. 근데 ebx로 접근하지도 않을뿐더러 사용하려고 접근하면 어셈블도 안되므로 우선은 빼줌. 
+											# 이와 비슷한 걸로는 _ITM_deregisterTMClone, _Jv_RegisterClasses 등이 있다. 
+											# 이들의 공통점으로는 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다...
+											# COMMENT: 하나의 휴리스틱 룰을 더 추가. R_386_GLOB_DAT 중에서 뒤에 @GLIBC가 붙지 않는 데이터는... 조또쓸데없는거시다...
+			del T_glob[key]
+		else:
+			T_glob[key] = T_glob[key] + '@GOT(%ebx)'
+
 
 def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 테이블
 	SHTABLE = {}
@@ -192,7 +234,6 @@ def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 �
 		SHTABLE[section.name]  = entry
 	f.close()
 	return SHTABLE
-
 
 def gen_assemblescript(LOC, filename):
 	'''
@@ -215,7 +256,7 @@ def gen_assemblescript(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
-	cmd += "as -g -o " # COMMENT: 디버깅할때 편리함을위해서 -g 옵션을 추가함 
+	cmd += "as -g -o " 
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += onlyfilename + "_reassemblable.s"
 	cmd += "\n"
@@ -235,85 +276,61 @@ def gen_assemblescript(LOC, filename):
 	
 	saved_filename = LOC + '/' + onlyfilename
 
-	f = open(saved_filename + "_assemble.sh", 'w')
+	f = open(saved_filename + "_compile.sh", 'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + saved_filename + "_assemble.sh"
+	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-# TODO: pie 바이너리에도 --entry=MYSTART  적용가능한가 인스펙트해보고 적용하기 
 def gen_assemblescript_for_piebinary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 
-	onlyfilename = filename.split('/')[-1]
+	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
-	cmd += "as -g -o "
-	cmd += onlyfilename + "_reassemblable.o "
-	cmd += onlyfilename + "_reassemblable.s"
-	cmd += "\n"
-	cmd += "ld -pie -o "
+	cmd += "gcc -g -pie -o "
 	cmd += onlyfilename + "_reassemblable "
-	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
-	cmd += "-lc "
-
-	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
-	for i in xrange(len(libraries)):
-		if "=>" in libraries[i]:
-			cmd += libraries[i].split(' ')[2]
-			cmd += " "	
-
-	cmd += onlyfilename + "_reassemblable.o "
-	cmd += crts
-	
+	cmd += onlyfilename + "_reassemblable.s "
+	cmd += "-m32 "
+	lines = res.splitlines()
+	for i in xrange(len(lines)):
+		if "=>" in lines[i]:
+			cmd += lines[i].split(' ')[2]
+			cmd += " "
 	saved_filename = LOC + '/' + onlyfilename
 
-	f = open(saved_filename + "_assemble_pie.sh", 'w')
+	f = open(saved_filename + "_compile.sh",'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + saved_filename + "_assemble_pie.sh"
+	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-# TODO: 라이브러리에도 --entry=MYSTART  적용가능한가 인스펙트해보고 적용하기 
 def gen_assemblescript_for_sharedlibrary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 
-	onlyfilename = filename.split('/')[-1]
+	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
-	cmd += "as -g -o "
-	cmd += onlyfilename + "_reassemblable.o "
-	cmd += onlyfilename + "_reassemblable.s"
-	cmd += "\n"
-
-	cmd += "ld -shared -soname "
-	cmd += get_soname(filename)
-	cmd += " -o " 
+	cmd += "gcc -g -fPIC -shared -o "
 	cmd += onlyfilename + "_reassemblable "
-	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
-	cmd += "-lc "
-
-	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
-	for i in xrange(len(libraries)):
-		if "=>" in libraries[i]:
-			cmd += libraries[i].split(' ')[2]
-			cmd += " "	
-
-	cmd += onlyfilename + "_reassemblable.o "
-	cmd += crts
-	
+	cmd += onlyfilename + "_reassemblable.s "
+	cmd += "-m32 "
+	lines = res.splitlines()
+	for i in xrange(len(lines)):
+		if "=>" in lines[i]:
+			cmd += lines[i].split(' ')[2]
+			cmd += " "
 	saved_filename = LOC + '/' + onlyfilename
 
-	f = open(saved_filename + "_assemble_library.sh", 'w')
+	f = open(saved_filename + "_compile.sh",'w')
 	f.write(cmd)
 	f.close()
 	
-	cmd = "chmod +x " + saved_filename + "_assemble_library.sh"
+	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-# TODO: 컴파일스크립트에도 --entry=MYSTART  적용가능한지... 혹은 그냥 이 함수 날려버려도 될듯? 안쓸것같은데. 
 def gen_compilescript(LOC, filename):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
@@ -329,7 +346,7 @@ def gen_compilescript(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
-	cmd += "gcc -o "
+	cmd += "gcc -g -o "
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "
@@ -338,7 +355,6 @@ def gen_compilescript(LOC, filename):
 		if "=>" in lines[i]:
 			cmd += lines[i].split(' ')[2]
 			cmd += " "
-
 	saved_filename = LOC + '/' + onlyfilename
 
 	f = open(saved_filename + "_compile.sh",'w')
@@ -355,45 +371,9 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 
 	f = open(saved_filename + "_reassemblable.s",'w')
 
-	# 다이나믹 글로벌 심볼들을 붙여준다. 
-	for sectionName in symtab.keys():
-		if sectionName in CodeSections_WRITE: # 다이나믹 심볼이 코드섹션에 있다면?
-			for DYNSYM_NAME in symtab[sectionName].values():
-				f.write('.global ' + DYNSYM_NAME + '\n')
-				f.write('.type ' + DYNSYM_NAME + ', @function\n')
 
-		'''
-		 .global ysum
-		 .type ysum, @function 
-		 이건데
-		 _init, _fini 도 이렇게 해줘도 동작에 문제가 없나?  ㅇㅇ 문제없음. --> COMMENT: 문제있음. objdump -T 에 _init이 안나오는 경우가 있음. 대신 objdump -t에 _init이 나오는 경우가 있는데 지금은 머리아프니까 나중에 해결고고싱
-		'''
-
-	# COMMENT: https://stackoverflow.com/questions/52367611/can-i-link-library-except-specific-symbol  이거보고 추가함 개쩐다...
-	'''
-	f.write(".section .rodata\n")
-	f.write(".globl _IO_stdin_used\n")
-	f.write(".type _IO_stdin_used, @object\n")
-	f.write(".align 4\n")
-	f.write("_IO_stdin_used:\n")
-	f.write(" .int 0x20001\n")
-	f.write(" .size _IO_stdin_used, 4\n")
-	'''
-
-	# COMMENT: https://stackoverflow.com/questions/52367611/can-i-link-library-except-specific-symbol 
-	# "I mean, if you need some kind of "main", then you can reuse it straight away, if you don't need main, then you can provide empty function (but then I'm not sure, if the crt1 will not run main + get exit from main + de-initialize everything... "
-	# crt1.o... 너를위해 준비햇서,,,ㅎ
-	# f.write(".global __libc_csu_fini\n")
-	# f.write(".global __libc_csu_init\n")
 	f.write(".global main\n")
-	# f.write(".global MYSTART\n")
-	# f.write("__libc_csu_fini:\n")
-	# f.write(" ret\n")
-	# f.write("__libc_csu_init:\n")
-	# f.write(" ret\n")
-	# f.write("main:\n")
-	# f.write(" ret\n")
-	# f.write(".global _start\n") 
+	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
 
@@ -411,7 +391,6 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 				f.write("\n"+".section "+sectionName+"\n")
 
 
-
 			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 			if comment == 1: 
 				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..
@@ -421,7 +400,6 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 			for address in sorted(resdic[sectionName].iterkeys()): #정렬
 				#for i in range(0,len(resdic[sectionName][address])): # 주석까지 프린트 하려면 활성화 해주길..
 				for i in xrange(RANGES):
-					#if len(resdic[sectionName][address]) >= RANGES: # 길이측정은 안해도될듯?
 					if len(resdic[sectionName][address][i]) > 0: # 그냥 엔터만 아니면 됨 
 						f.write(resdic[sectionName][address][i]+"\n")
 	f.close()
