@@ -49,13 +49,7 @@ def global_symbolize_000section(dics_of_000, symtab_000):
 
 
 def not_global_symbolize_datasection(resdic):
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
-	print "not_global_symbolize_datasection"
+	print "\n\n\nnot_global_symbolize_datasection"
 	print "DataSections_WRITE : {}".format(DataSections_WRITE)
 	print "DataSections_IN_resdic : {}".format(DataSections_IN_resdic)
 
@@ -71,17 +65,15 @@ def not_global_symbolize_datasection(resdic):
 						spoiled = resdic[SectionName][addr][0]
 						if '@' in spoiled:
 							spoiled = spoiled[:spoiled.index('@')] + ':' # stderr@GOT(%ebx) 이런식으로 지어진 이름의 심볼. 즉, .got 안에 들어가 앉아있는 데이터셈볼 (RELocation Table 에서 R_386_GLOB_DAT 속성의 심볼임) 
-						
+						'''
 						if SectionName == '.got': # 섹션네임이 got라면 외부에서 링킹받아와다 지금 로컬에 데이터가 있는상태다. 즉 로컬데이터가 의미있다는 거시다. 
 							continue
-
+						'''
 						spoiled = 'MYSYM_' + spoiled
 						resdic[SectionName][addr][0] = spoiled
 	return resdic	
 
-
-
-def PIE_symbolize_getpcthunk(resdic):
+def getpcthunk_labeling(resdic):
 	# p_rint "PIE_symbolize_getpcthunk"
 
 	pcthunk_reglist = [] # 필요할지도 모르니까, getpcthunk의 결과가 들어가는 레지스터들의 리스트들도 따로 저장해둠.ㅋ
@@ -263,8 +255,6 @@ def lfunc_change_loop_call_jmp_and_hexvalue_instruction_to_data(dics_of_text):
 					dics_of_text[key][1] = line_data
 					# p_rint dics_of_text[key][1]
 
-
-
 def lfunc_remove_callweirdfunc(dics_of_text):
 	'''
 	call   2700 <main@@Base-0xcda0> --> 
@@ -277,5 +267,9 @@ def lfunc_remove_callweirdfunc(dics_of_text):
 			l_funcname  = "XXX" 
 			dics_of_text.update({key:[dics_of_text.values()[i][0],l_instname+" "+l_funcname]})
 
-
+def fill_blanked_symbolname_toward_GOTSECTION(resdic):
+	for SectionName in resdic.keys():
+		for addr in resdic[SectionName].keys():
+			if 'REGISTER_WHO' in resdic[SectionName][addr][1]:
+				resdic[SectionName][addr][1] = resdic[SectionName][addr][1].replace('REGISTER_WHO', '%'+resdic[SectionName][addr][3])
 

@@ -13,7 +13,7 @@ import pwn
 from etc import *
 from keystone import *
 from global_variables import *
-
+from elftools.elf.relocation import RelocationSection
 
 
 def extract_OPCODE_and_OPCODEinModRM(hexified_i_byte):
@@ -473,27 +473,27 @@ def binarycode2dic(filename, SHTABLE):
 	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
 
-# TODO: 이 함수는 곧 readelf 함수와 통합됩니다.. readelf -a 의 .dynsym 섹션이거등요. 그럼 수고. 
-def get_dynsymtab(filename): 
-	'''
-	- usage)
-		input : binary name
-		output : dict {address:symbolname, ...}
-	'''
-	cmd = 'objdump -T '+filename
-	res = subprocess.check_output(cmd, shell=True)
-	lines = res.splitlines() 
-	symtab = {}
-	for i in range(0,len(lines)):
-		line = re.sub('\s+',' ',lines[i]).strip() # duplicate space, tab --> single space
-		l = line.split(' ')
-		if len(l) > 5:
-			if 'g' in l[1]: # global symbol 만 취급합니더,,,ㅋㅋ
-				if l[3] not in symtab.keys(): symtab[l[3]] = {} # init
-				symtab[l[3]][int('0x'+l[0], 16)] = l[6]
-	return symtab
+def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
+	RET = {'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}}
+	R_386 = {5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
 
-
+	bin = ELFFile(open(filename,'rb'))
+	for section in bin.iter_sections():
+		if not isinstance(section, RelocationSection):
+			continue
+		else:
+			symtable = bin.get_section(section['sh_link']) # symtable = '.dynsym' 섹션임. sh_link 정보를가지고 어떤 섹션에 접근을 하는구나. 
+			for rel in section.iter_relocations():
+				# rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']\
+				_type = rel['r_info_type']
+				symbol = symtable.get_symbol(rel['r_info_sym'])
+				if symbol.name != '':
+					RET[R_386[_type]][rel['r_offset']] = symbol.name
+	for key in RET.keys():
+		print key
+		for addr in RET[key].keys():
+			print "{} : {}".format(hex(addr), RET[key][addr])
+	return RET
 
 # input : 파일이름
 # output : '.rel.dyn' 등 특정섹션의 readelf -a 결과를 파싱해서 리턴함['001b1edc', '00069b06', 'R_386_GLOB_DAT', '001b2be8', '__progname_full'] 

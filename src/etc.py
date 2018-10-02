@@ -205,16 +205,27 @@ def remove_brackets(dics_of_text):
 		except:
 			"dummy"
 
-def setsymbolnamefor_GLOB_DAT(T_glob):
+def eliminate_weird_GLOB_DAT(T_glob):
+	# GLOB_DAT 심볼일 자격이 없는얘들을 제명... 
+	# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다...
+	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
 	for key in T_glob.keys():
-		if T_glob[key] == '__gmon_start__': # __gmon_start__ 는 일반바이너리에도 있는 GLOB_DAT이다. 근데 ebx로 접근하지도 않을뿐더러 사용하려고 접근하면 어셈블도 안되므로 우선은 빼줌. 
-											# 이와 비슷한 걸로는 _ITM_deregisterTMClone, _Jv_RegisterClasses 등이 있다. 
-											# 이들의 공통점으로는 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다...
-											# COMMENT: 하나의 휴리스틱 룰을 더 추가. R_386_GLOB_DAT 중에서 뒤에 @GLIBC가 붙지 않는 데이터는... 조또쓸데없는거시다...
+		if T_glob[key] in eliminate: 
 			del T_glob[key]
-		else:
-			T_glob[key] = T_glob[key] + '@GOT(%ebx)'
 
+def concat_symbolname_to_TABLE(T, concat):
+	for key in T.keys():
+		T[key] = T[key] + concat
+'''
+def set_symbolnameTABLE_for_GLOB_DAT(T_glob):
+	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
+	for key in T_glob.keys():
+		T_glob[key] = T_glob[key] + '@GOT(REGISTER_WHO)'
+
+def set_jumptable_toward_PLT(T_got2name):
+	for key in T_got2name.keys():
+		T_got2name[key] = T_got2name[key] + '@PLT'
+'''
 
 def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 테이블
 	SHTABLE = {}
@@ -283,7 +294,7 @@ def gen_assemblescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblescript_for_piebinary(LOC, filename):
+def gen_compilescript_for_piebinary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 
@@ -307,7 +318,7 @@ def gen_assemblescript_for_piebinary(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblescript_for_sharedlibrary(LOC, filename):
+def gen_compilescript_for_sharedlibrary(LOC, filename):
 	cmd = 'ldd ' + filename
 	res = subprocess.check_output(cmd, shell=True)
 
@@ -364,7 +375,7 @@ def gen_compilescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
+def gen_assemblyfile(LOC, resdic, filename, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 
 	saved_filename = LOC + '/' + onlyfilename
@@ -399,7 +410,7 @@ def gen_assemblyfile(LOC, resdic, filename, symtab, comment):
 				RANGES = 2
 			for address in sorted(resdic[sectionName].iterkeys()): #정렬
 				#for i in range(0,len(resdic[sectionName][address])): # 주석까지 프린트 하려면 활성화 해주길..
-				for i in xrange(RANGES):
+				for i in xrange(RANGES): 
 					if len(resdic[sectionName][address][i]) > 0: # 그냥 엔터만 아니면 됨 
 						f.write(resdic[sectionName][address][i]+"\n")
 	f.close()
