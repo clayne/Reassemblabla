@@ -60,7 +60,9 @@ def post_getpcthunk_handling(resdic):
 						DISASM = resdic[SectionName][addrlist[i+1]][1]
 						print DISASM
 						hex_in_DISASM = hex(extract_hex_addr(DISASM)[0])
-						DISASM = DISASM.replace(hex_in_DISASM, '_GLOBAL_OFFSET_TABLE_')						resdic[SectionName][addrlist[i+1]][1] = DISASM
+						DISASM = DISASM.replace(hex_in_DISASM, '_GLOBAL_OFFSET_TABLE_')
+						
+						resdic[SectionName][addrlist[i+1]][1] = DISASM
 					
 
 
