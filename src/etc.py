@@ -388,11 +388,12 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
 
-
+	f.write(".section .got\n")
+	f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
-			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors']
+			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors', '.plt.got']
 			SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
 			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
 				f.write("\n" + ".section " + ".text" + "\n")

@@ -251,7 +251,7 @@ def PIE_calculated_addr_symbolize(resdic):
 
 # leal.d32 -0x1334(%ebx), %edi // 이렇게 출처를 알수없는 ebx 나 edx 가 쓰일때는, if (GOT로 가정했을때) GOT-0x1334가 memory address에 fit 하면 --> 심볼라이즈, 아니라면 --> 안심볼라이즈 이렇게하자... 
 # TODO: PIE_calculate_remainedpointer_HEURISTICALLY 이함수를 Getpcthunk 안에서 콜하는 대상이 되는 베이직블락 안에서도 유효값을가지는 레지스터들을 킵 트래킹하도록 수정하기 . ls 디스어셈블해보면 -1(%ebx), %eax 도 MYSYM_PIE_REMAIN_0 으로 심볼라이즈하고 난리났다 아주..
-def PIE_calculate_remainedpointer_HEURISTICALLY(pcthunk_reglist, resdic):
+def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic):
 	# The Ultimate REGEX!
 	_ = '.*?'
 	p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # leal.d32 -3(%ebx), %eax
@@ -261,11 +261,11 @@ def PIE_calculate_remainedpointer_HEURISTICALLY(pcthunk_reglist, resdic):
 	p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
 
 	GOT_baseaddr = sorted(resdic['.got.plt'])[0] # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
-	count = 0
+	count = 0 
 	# 우선은 libstdbuf.so 에서 사용하는 패턴인 lea, mov 만 가지고 해보자. 
-	# 우선은 쭉 트래킹해주는건 빼고, 걍 있는그대로 ebx-0x1234 의 위치만 계산해서 심볼라이즈해주는것까지만. 
 	SectionName = CodeSections_WRITE
-	print "\n\nPIE_calculate_remainedpointer_HEURISTICALLY....."
+	print "\n\n\nPIE_DynamicSymbolize_GOTbasedpointer....."
+	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 	for Sname in SectionName:
 		if Sname not in resdic.keys(): continue # 섹션이 없는경우에는 처리안해주고 걍 continue
 
@@ -273,52 +273,121 @@ def PIE_calculate_remainedpointer_HEURISTICALLY(pcthunk_reglist, resdic):
 		SORTED_ADDRESS = SectionDic.keys()
 		SORTED_ADDRESS.sort()
 		
+		'''
+		[0]이위치의 원래이름: 
+		[1] cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %(레지스터)
+		    je MYSYM_YES_12
+
+		    MYSYM_NO_12:
+		     원본인스트럭션
+		     jmp MYSYM_ORIGINAL_12
+
+		    MYSYM_YES_12:
+		     바뀐인스트럭션(심볼라이즈됨)
+		     jmp MYSYM_ORIGINAL_12
+
+		    MYSYM_OROGINAL: <- 다음인스트럭션의 심볼이 이미 붙어있다면 그것을 따르도록 한다. 
+		     blabla...
+		'''
+
 		for i in xrange(len(SORTED_ADDRESS)):
 			DISASM = SectionDic[SORTED_ADDRESS[i]][1]
 			if p_lea.match(DISASM) is not None:
 				# SETUP
-				reg = DISASM[DISASM.index('(')+2:DISASM.index(')')]
 				ADD_VALUE = extract_hex_addr(DISASM)[0]
 				REGLIST = extract_register(DISASM)
 				INSTRUCTION = DISASM.split(' ')[1]
 
-				if reg in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
+				if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
 					DESTINATION = GOT_baseaddr + ADD_VALUE 
 					for target_section in resdic.keys():
-						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면# if target_section in DataSections_WRITE: # 그섹션이 바로 데이터섹션이오라면? (TODO: 데이터섹션만 ^알려지지않은 calculated code pointer^로 접근하는지 확인... 너무 휴리스틱한가??? )
-							# 심볼라이즈 시작!!!
+						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
+							# 심볼이름 셋팅
+							symbolname_yes  = 'MYSYM_PIE_YES_'    + str(count)
+							symbolname_no   = 'MYSYM_PIE_NO_'     + str(count)
+							# symbolname_next = ???
+							if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
+								symbolname_next = 'MYSYM_PIE_ORIG_'   + str(count) 
+								resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
+							else :
+								symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
+							# symbolname = ???
 							if resdic[target_section][DESTINATION][0] == '': 
 								symbolname = 'MYSYM_PIE_REMAIN_' + str(count)
-								count += 1
 								resdic[target_section][DESTINATION][0] = symbolname + ':'
 							else:
 								symbolname = resdic[target_section][DESTINATION][0][:-1]
+							count += 1
+
 							NEWDISASM = ' ' + INSTRUCTION + ' ' + symbolname + ', ' + '%' + REGLIST[1]
-							resdic[Sname][SORTED_ADDRESS[i]][1] = NEWDISASM
+							ORIDISASM = resdic[Sname][SORTED_ADDRESS[i]][1]
+							
+							CODEBLOCK  = '\n'
+							CODEBLOCK += '   cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + '\n'
+							CODEBLOCK += '   je ' + symbolname_yes + '\n'
+							CODEBLOCK += '\n'
+							CODEBLOCK += '   ' + symbolname_no + ':' + '\n'
+							CODEBLOCK += '  ' + ORIDISASM + '\n'
+							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
+							CODEBLOCK += '\n'
+							CODEBLOCK += '   ' + symbolname_yes + ':' + '\n'
+							CODEBLOCK += '  ' + NEWDISASM + '\n'
+							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
+							CODEBLOCK += '\n'
+							# 오케이. 프린트해보자 이제.
+							resdic[Sname][SORTED_ADDRESS[i]][1] = CODEBLOCK
 							resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
 							print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
 
 
+
+
+
 			elif p_mov.match(DISASM) is not None:
 				# SETUP
-				reg = DISASM[DISASM.index('(')+2:DISASM.index(')')]
 				ADD_VALUE = extract_hex_addr(DISASM)[0]
 				REGLIST = extract_register(DISASM)
 				INSTRUCTION = DISASM.split(' ')[1]
 
-				if reg in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
+				if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
 					DESTINATION = GOT_baseaddr + ADD_VALUE
 					for target_section in resdic.keys():
 						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
-							# 심볼라이즈 시작!!!
+							# 심볼이름 셋팅
+							symbolname_yes  = 'MYSYM_PIE_YES_'    + str(count)
+							symbolname_no   = 'MYSYM_PIE_NO_'     + str(count)
+							# symbolname_next = ???
+							if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
+								symbolname_next = 'MYSYM_PIE_ORIG_'   + str(count) 
+								resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
+							else :
+								symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
+							# symbolname = ???
 							if resdic[target_section][DESTINATION][0] == '': 
 								symbolname = 'MYSYM_PIE_REMAIN_' + str(count)
-								count += 1
 								resdic[target_section][DESTINATION][0] = symbolname + ':'
 							else:
 								symbolname = resdic[target_section][DESTINATION][0][:-1]
+							count += 1
+
 							NEWDISASM = ' ' + INSTRUCTION + ' ' + symbolname + ', ' + '%' + REGLIST[1]
-							resdic[Sname][SORTED_ADDRESS[i]][1] = NEWDISASM
+							ORIDISASM = resdic[Sname][SORTED_ADDRESS[i]][1]
+							
+							
+							CODEBLOCK  = '\n'
+							CODEBLOCK += '   cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + '\n'
+							CODEBLOCK += '   je ' + symbolname_yes + '\n'
+							CODEBLOCK += '\n'
+							CODEBLOCK += '   ' + symbolname_no + ':' + '\n'
+							CODEBLOCK += '  ' + ORIDISASM + '\n'
+							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
+							CODEBLOCK += '\n'
+							CODEBLOCK += '   ' + symbolname_yes + ':' + '\n'
+							CODEBLOCK += '  ' + NEWDISASM + '\n'
+							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
+							CODEBLOCK += '\n'
+							# 오케이. 프린트해보자 이제.
+							resdic[Sname][SORTED_ADDRESS[i]][1] = CODEBLOCK
 							resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
 							print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
 					

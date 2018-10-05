@@ -32,13 +32,15 @@ def pltsection_sanitize(resdic):
 		if SectionName in pltsections:
 			for addr in resdic[SectionName].keys():
 				if resdic[SectionName][addr][0] == '':
-					resdic[SectionName][addr][0] = 'XXX:'
+					# resdic[SectionName][addr][0] = 'XXX:'
+					"TODO: 뭔가 이상해... .plt.got 섹션에 XXX: 가 난무하게 되... 어........"
+					"TODO: __gmon_start__ 가 참조될수있도록 해줘야 해..."
 
 
 def global_symbolize_000section(dics_of_000, symtab_000):
 	for i in range(0, len(symtab_000.keys())):
 		if symtab_000.keys()[i] in dics_of_000.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
-			# COMMENT: _init, _fini 는 crti.o 에 이미 정의되어있다고하면서 링커에러남. 어차피  원래있던 _init은 안쓸거기도하고. 심볼이름이 그닥중요하진않으니까 심볼이름바꿔서 심볼라이즈 ㄱㄱ
+			#  _init, _fini 는 crti.o 에 이미 정의되어있다고하면서 링커에러남. 어차피  원래있던 _init은 안쓸거기도하고. 심볼이름이 그닥중요하진않으니까 심볼이름바꿔서 심볼라이즈 ㄱㄱ
 			if symtab_000.values()[i] == '_init' or symtab_000.values()[i] == '_fini':
 				dics_of_000[symtab_000.keys()[i]][0] = 'MY_' + symtab_000.values()[i]+":"
 			else:
@@ -46,17 +48,29 @@ def global_symbolize_000section(dics_of_000, symtab_000):
 	return dics_of_000
 
 
+def post_getpcthunk_handling(resdic):
+	print '\n\npost_getpcthunk_handling...'
+	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	for SectionName in resdic.keys():
+		if SectionName in CodeSections_WRITE: # 코드섹션이라면
+			addrlist = sorted(resdic[SectionName]) 
+			for i in xrange(len(addrlist)):
+				if 'call' in resdic[SectionName][addrlist[i]][1] and '__x86.get_pc_thunk.' in resdic[SectionName][addrlist[i]][1]:
+					if 'add' in resdic[SectionName][addrlist[i+1]][1]:
+						DISASM = resdic[SectionName][addrlist[i+1]][1]
+						print DISASM
+						hex_in_DISASM = hex(extract_hex_addr(DISASM)[0])
+						DISASM = DISASM.replace(hex_in_DISASM, '_GLOBAL_OFFSET_TABLE_')						resdic[SectionName][addrlist[i+1]][1] = DISASM
+					
+
+
+
+
 
 
 def not_global_symbolize_datasection(resdic):
-	print "\n\n\nnot_global_symbolize_datasection"
-	print "DataSections_WRITE : {}".format(DataSections_WRITE)
-	print "DataSections_IN_resdic : {}".format(DataSections_IN_resdic)
-
-
 	for SectionName in resdic.keys():
 		if SectionName in DataSections_IN_resdic: # 데이터 섹션이라면 
-			print SectionName
 			for addr in resdic[SectionName].keys():
 				if resdic[SectionName][addr][0] != '': # 심볼이 붙어있는데
 					if resdic[SectionName][addr][0].startswith('MYSYM_') == True:

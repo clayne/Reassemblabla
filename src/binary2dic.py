@@ -275,11 +275,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				DISASSEMBLY_for_reassemble = '' # init
 				_errorcode = 'default'
 			
+
 			#[BUG-C] CAPSTONE 0x66, 0x90 TO 'nop' ISSUE HANDLING 
 			if binascii.hexlify(i.bytes) == '6690':
 				_errorcode = 'goto data' # 데이터처리 부분으로 보내버리기 
 				break # restart "cs.disasm"
 			
+
 			#[BUG-D] wrong mov suffix when source register is segment register... https://github.com/aquynh/capstone/issues/1240
 			if i.mnemonic.startswith('mov'):
 				SegmentRegister = ['%cs','%ds','%ss','%es','%gs','%fs']
@@ -288,11 +290,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					MY_mnemoonic = 'movw'
 					_errorcode = 'default'
 
+
 			#[BUG-E] Capstone disassembles [ff 15 00 00 00 00] to 	[calll *]... https://github.com/aquynh/capstone/issues/1241
 			if i.mnemonic.startswith('call'):
 				if i.op_str == '*':
 					MY_op_str = '*0x00'
 				_errorcode = 'default'
+
 
 			#[BUG-F] SRC and DEST location changed! on bound instruction... https://github.com/aquynh/capstone/issues/1242 
 			# (버그있는)as에게 주기위해서 MY_op_str를 설정해주지만, 위대하신 keystone-capstone 은 올바른 disassembly를 입력받길원하시므로 
@@ -302,6 +306,17 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				DISASSEMBLY_for_reassemble = i.mnemonic + _displacement + i.op_str
 				_errorcode = 'default'
 
+			#TODO: 이거 working 하게 고치기
+			# [BUG-E] lea 0x0(%edi,%eiz,1),%edi 의 7 byte nop을  lea  0x0(%edi),%edi 으로 디스어셈블함 ㅠ 
+			'''
+			if i.mnemonic.startswith('lea') and len(i.bytes) == 7:
+				print "######################################################################"
+				print i.mnemonic
+				print i.op_str
+				print binascii.hexlify(i.bytes)
+				_errorcode = 'goto data' # 8dbc2700000000
+				break
+			'''
 
 			# [ADDITIONAL FEATURE] undocumented instruction salc handling
 			if i.mnemonic == 'salc': 
@@ -489,10 +504,7 @@ def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다
 				symbol = symtable.get_symbol(rel['r_info_sym'])
 				if symbol.name != '':
 					RET[R_386[_type]][rel['r_offset']] = symbol.name
-	for key in RET.keys():
-		print key
-		for addr in RET[key].keys():
-			print "{} : {}".format(hex(addr), RET[key][addr])
+
 	return RET
 
 # input : 파일이름

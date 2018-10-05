@@ -105,8 +105,9 @@ if __name__=="__main__":
 	else:
 		mainaddr = findmain(options.filename, resdic, __libc_start_main_addr, CHECKSEC_INFO)
 	startaddr = findstart(options.filename)
+
 	if mainaddr == -1: 
-		resdic['.text'][startaddr][0] = "_start:"
+		resdic['.text'][startaddr][0] = "MYSYM_ENTRY:" # "_start:" 가 들어가면, 왠진모르겠지만 라이브러리의 call _start 에서 이상한 곳을 CALL 하게된다. 
 	else: 
 		resdic['.text'][mainaddr][0] = "main:"
 
@@ -120,7 +121,6 @@ if __name__=="__main__":
 	# get_pc_thunk 같은게 있을경우 이거 심볼라이즈
 	pcthunk_reglist = getpcthunk_labeling(resdic)
 
-
 	# ===일반 address 심볼라이즈===
 	symbolize_textsection(resdic)
 	symbolize_datasection(resdic)
@@ -131,8 +131,8 @@ if __name__=="__main__":
 	PIE_calculated_addr_symbolize(resdic)
 	
 
-	# TODO: 이 라인 활성화 ... 고쳐서 활성화..
-	# PIE_calculate_remainedpointer_HEURISTICALLY(pcthunk_reglist, resdic)
+	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
+	PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic)
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
 	for SectionName in CodeSections_WRITE:
@@ -144,14 +144,15 @@ if __name__=="__main__":
 			lfunc_change_loop_call_jmp_and_hexvalue_instruction_to_data(resdic[SectionName])
 	
 
+
 	# ===마지막으로 call stderror@GOT(REGISTER_WHO)로 blank로 심볼리제이션된거 resdic[3]을 참조해서 레지스터자리채워주기===
 	fill_blanked_symbolname_toward_GOTSECTION(resdic)
 
-
 	# ===data sections 에 아직 남아있는 dynamic symbol 을 없애버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도댐)===
-	print "resdic.keys() : {}".format(resdic.keys())
 	not_global_symbolize_datasection(resdic)
 
+	# ===getpcthunk 바로다음에는 add $_GLOBAL_OFFSET_TABLE_ 이 와야하므로 그부분만 좀 바꿔준다. [주의] add $0x123->$_GOT_ 가 되는데, 0x123은 PIE 에뮬레이션할때 사용됨. 따라서 이 작업은 모든작업이 끝난후에 하자. 
+	post_getpcthunk_handling(resdic) 
 
 	if options.align is True: 
 		if '.text' in resdic.keys():
