@@ -48,6 +48,8 @@ def global_symbolize_000section(dics_of_000, symtab_000):
 	return dics_of_000
 
 
+
+
 def post_getpcthunk_handling(resdic):
 	print '\n\npost_getpcthunk_handling...'
 	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
@@ -57,12 +59,18 @@ def post_getpcthunk_handling(resdic):
 			for i in xrange(len(addrlist)):
 				if 'call' in resdic[SectionName][addrlist[i]][1] and '__x86.get_pc_thunk.' in resdic[SectionName][addrlist[i]][1]:
 					if 'add' in resdic[SectionName][addrlist[i+1]][1]:
+
 						DISASM = resdic[SectionName][addrlist[i+1]][1]
-						print DISASM
+						if '$' and ',' in DISASM: #add $MYSYM_745, %ebx
+							TRASH = DISASM[DISASM.index('$')+1:DISASM.index(',')]
+							DISASM = DISASM.replace(TRASH, '_GLOBAL_OFFSET_TABLE_')
+							resdic[SectionName][addrlist[i+1]][1] = DISASM
+						# 원래는 헥스값을 발라내서 $_GLOBAL_OFFSET_TABLE_ 과 리플레이스 했으나, add $MYSYM_745, %ebx 같이 잘못심볼라이즈된경우에 MYSYM_745 리플레이스를 못하는 에러가 있었따리...
+						'''	
 						hex_in_DISASM = hex(extract_hex_addr(DISASM)[0])
 						DISASM = DISASM.replace(hex_in_DISASM, '_GLOBAL_OFFSET_TABLE_')
-						
 						resdic[SectionName][addrlist[i+1]][1] = DISASM
+						'''
 					
 
 

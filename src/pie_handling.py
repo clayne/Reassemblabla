@@ -68,7 +68,8 @@ def PIE_calculated_addr_symbolize(resdic):
 
 					# 코드슬라이싱을 끝내는 조건
 					if 'ret' in DISASM: break   # 베이직블락 끝나면 break
-					
+					if 'get_pc_thunk' in DISASM: break
+
 					# 여러가지의 룰을 정의 
 					_ = '.*?'
 					p_add   = re.compile(' add' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # add $0x1b53, %ebx
@@ -84,7 +85,12 @@ def PIE_calculated_addr_symbolize(resdic):
 					# reg[REGLIST[0]] != 0 이 조건 말고, 그냥 리스트에 더하거나 빼는걸로 가자~
 
 					# EMU_01 : [addl $0x19c7, %ebx]
+					# TODO: get_pc_thunk 바로뒤에 오는 add는 에뮬레이션만 해주되, NEWDISASM 로 바꾸지는 않는다. 
+					# TODO: 그리고 그후에 오는 add는 NEWDISASM으로 바꿔주긴 하되, add가 아니라 lea로 바꿔줘야 한다. 더해주는값을 심볼리제이션해주는게 아니라 결과값을 심볼리제이션하는 것이므로. 
 					if p_add.match(DISASM) is not None: 
+						if 'get_pc_thunk' in SectionDic[SORTED_ADDRESS[i-1]][1]:
+							continue # get_pc_thunk 바로뒤의 add는 add $_GLOBAL_OFFSET_TABLE_, %ebx 이므로 건드리지않고 걍 패스한다. 
+
 						if len(extract_hex_addr(DISASM)) > 0:
 							ADD_VALUE = extract_hex_addr(DISASM)[0]
 							REGLIST   = extract_register(DISASM)
@@ -108,6 +114,7 @@ def PIE_calculated_addr_symbolize(resdic):
 										found_target = 1
 										break
 								if found_target == 1 and target_section in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+									INSTRUCTION = 'lea'
 									NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[0]
 									resdic[Sname][SORTED_ADDRESS[i]][1] = NEWDISASM
 									print "       {}".format(NEWDISASM)
@@ -270,7 +277,7 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 		GOT_baseaddr = sorted(resdic['.got.plt'].keys())[0]  # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
 
 
-	
+
 	count = 0 
 	# 우선은 libstdbuf.so 에서 사용하는 패턴인 lea, mov 만 가지고 해보자. 
 	SectionName = CodeSections_WRITE
