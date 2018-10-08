@@ -489,8 +489,8 @@ def binarycode2dic(filename, SHTABLE):
 	return resdic
 
 def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
-	RET = {'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}}
-	R_386 = {5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
+	RET = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 우선 바이너리의 심볼테이블에도(/bin/dash) 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 부족함...  
+	R_386 = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
 
 	bin = ELFFile(open(filename,'rb'))
 	for section in bin.iter_sections():
@@ -499,10 +499,18 @@ def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다
 		else:
 			symtable = bin.get_section(section['sh_link']) # symtable = '.dynsym' 섹션임. sh_link 정보를가지고 어떤 섹션에 접근을 하는구나. 
 			for rel in section.iter_relocations():
-				# rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']\
+				# rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']
+				
 				_type = rel['r_info_type']
+
 				symbol = symtable.get_symbol(rel['r_info_sym'])
+
 				if symbol.name != '':
+					print rel
+					print symbol.name
+					print _type
+					print R_386[_type]
+					print rel['r_offset']
 					RET[R_386[_type]][rel['r_offset']] = symbol.name
 
 	return RET

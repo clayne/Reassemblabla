@@ -132,7 +132,7 @@ if __name__=="__main__":
 	
 
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
-	PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic)
+	PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO)
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
 	for SectionName in CodeSections_WRITE:
