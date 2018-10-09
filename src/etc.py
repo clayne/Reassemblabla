@@ -408,8 +408,10 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 			SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
 			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
 				f.write("\n" + ".section " + ".text" + "\n")
+				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
 			elif sectionName in SectionThatLoaderAutomaticallyAdds_data:
 				f.write("\n" + ".section " + ".data" + "\n")
+				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
 			else:
 				f.write("\n"+".section "+sectionName+"\n")
 
