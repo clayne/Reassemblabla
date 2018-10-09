@@ -132,16 +132,6 @@ def parseline(line, type):
 		return dic_text 
 
 def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
-	print "findmain"
 	# call __libc_start_main 이 아니라, call 0x8108213 (0x8108213 주소의 심볼 : __libc_start_main) 이더라도 main을 리턴할수 있게만 하면되지.
 	'''
 	entry point 로부터 main 의 주소를 파싱해서 리턴
@@ -168,7 +158,7 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 				main = extract_hex_addr(befoline)[0]
 				break
 		befoline = line
-		print main
+		
 
 	# pie 바이너리에는 .got  섹션 안에 main의 위치가 있었다. 
 	# 그래서 __libc_start_main 의 바로 위칸에서 원래는 push $main 을 해야할 때,
@@ -183,7 +173,6 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 
 	if CHECKSEC_INFO.pie == True:
 		mainaddr_is_in = _GLOBAL_OFFSET_TABLE_ + main
-		print "main *********** : {}".format(hex(mainaddr_is_in))
 		for addr in sorted(resdic['.got'].keys()):
 			if mainaddr_is_in == addr:
 				main  = ''
@@ -405,7 +394,8 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
 			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors', '.plt.got']
-			SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
+			#SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
+			SectionThatLoaderAutomaticallyAdds_data = ['.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata'] # ---> 지금 이거 활성화함. 그래서 init_array, fini_array 가 그대로 갖다 박히게끔 했더니 segmentation fault 남.
 			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
 				f.write("\n" + ".section " + ".text" + "\n")
 				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
@@ -415,8 +405,10 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 			else:
 				f.write("\n"+".section "+sectionName+"\n")
 
-
-			f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
+			if sectionName == '.init_array' or sectionName == '.fini_array':
+				'--> 원래 .init_array, .fini_array는 align되면 안된다. 왜냐하면 저장된 주소레퍼런스값을 순회할때 +4+4... 으로 포인터값을 늘려나가는데, 00000000 패딩이 추가된다면 그곳을 실행하게되기 때문이다. '
+			else:
+				f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 			if comment == 1: 
 				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..
 				RANGES = 3 #3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 어셈블도 안될텐데.

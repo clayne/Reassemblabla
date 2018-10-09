@@ -1,4 +1,3 @@
-#CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.eh_frame'] # TODO: .eh_frame is created automatically.... why? haha.. is it similar one with plt.got??? .....
 CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.plt.got']
 DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata'] # <.jcr> added for handling pie binary.
 AllSections_WRITE = CodeSections_WRITE + DataSections_WRITE
