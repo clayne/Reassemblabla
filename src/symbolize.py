@@ -72,10 +72,6 @@ def post_getpcthunk_handling(resdic):
 					
 
 
-
-
-
-
 def not_global_symbolize_datasection(resdic):
 	for SectionName in resdic.keys():
 		if SectionName in DataSections_IN_resdic: # 데이터 섹션이라면 

@@ -88,9 +88,6 @@ def PIE_calculated_addr_symbolize(resdic):
 					# TODO: get_pc_thunk 바로뒤에 오는 add는 에뮬레이션만 해주되, NEWDISASM 로 바꾸지는 않는다. 
 					# TODO: 그리고 그후에 오는 add는 NEWDISASM으로 바꿔주긴 하되, add가 아니라 lea로 바꿔줘야 한다. 더해주는값을 심볼리제이션해주는게 아니라 결과값을 심볼리제이션하는 것이므로. 
 					if p_add.match(DISASM) is not None: 
-						if 'get_pc_thunk' in SectionDic[SORTED_ADDRESS[i-1]][1]:
-							continue # get_pc_thunk 바로뒤의 add는 add $_GLOBAL_OFFSET_TABLE_, %ebx 이므로 건드리지않고 걍 패스한다. 
-
 						if len(extract_hex_addr(DISASM)) > 0:
 							ADD_VALUE = extract_hex_addr(DISASM)[0]
 							REGLIST   = extract_register(DISASM)
