@@ -506,11 +506,6 @@ def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다
 				symbol = symtable.get_symbol(rel['r_info_sym'])
 
 				if symbol.name != '':
-					print rel
-					print symbol.name
-					print _type
-					print R_386[_type]
-					print rel['r_offset']
 					RET[R_386[_type]][rel['r_offset']] = symbol.name
 
 	return RET

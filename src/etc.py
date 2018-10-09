@@ -132,6 +132,16 @@ def parseline(line, type):
 		return dic_text 
 
 def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
+	print "findmain"
 	# call __libc_start_main 이 아니라, call 0x8108213 (0x8108213 주소의 심볼 : __libc_start_main) 이더라도 main을 리턴할수 있게만 하면되지.
 	'''
 	entry point 로부터 main 의 주소를 파싱해서 리턴
@@ -158,6 +168,7 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 				main = extract_hex_addr(befoline)[0]
 				break
 		befoline = line
+		print main
 
 	# pie 바이너리에는 .got  섹션 안에 main의 위치가 있었다. 
 	# 그래서 __libc_start_main 의 바로 위칸에서 원래는 push $main 을 해야할 때,

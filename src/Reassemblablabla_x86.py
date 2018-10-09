@@ -98,12 +98,14 @@ if __name__=="__main__":
 	# main 을 labeling 하기 위한 20줄에 걸친 몸부림..
 	__libc_start_main_addr = -1
 	for addr in T_plt2name.keys():
-		if T_plt2name[addr] == '__libc_start_main':
+		print  T_plt2name[addr]
+		if '__libc_start_main' in T_plt2name[addr]: # 함수이름이 __libc_start_main@PLT 인 경우가 있기때문에 in 을 써줌. 
 			__libc_start_main_addr = addr
 	if __libc_start_main_addr == -1:
 		mainaddr = -1
 	else:
 		mainaddr = findmain(options.filename, resdic, __libc_start_main_addr, CHECKSEC_INFO)
+
 	startaddr = findstart(options.filename)
 
 	if mainaddr == -1: 

@@ -51,8 +51,6 @@ def global_symbolize_000section(dics_of_000, symtab_000):
 
 
 def post_getpcthunk_handling(resdic):
-	print '\n\npost_getpcthunk_handling...'
-	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
 	for SectionName in resdic.keys():
 		if SectionName in CodeSections_WRITE: # 코드섹션이라면
 			addrlist = sorted(resdic[SectionName]) 
