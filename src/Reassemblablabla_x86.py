@@ -178,11 +178,11 @@ if __name__=="__main__":
 
 
 	# Select which script to generate!
-	if mainaddr == -1: # library...maybe?
-		gen_compilescript_for_sharedlibrary(LOC, options.filename)
-
-	elif CHECKSEC_INFO.pie == True: # pie binary... without main (TODO: 이런일은 있을수가 없으므로 gen_assemblescript_for_piebinary 를 gen_compilescript_forPIE로 바꿀 것)
+	if CHECKSEC_INFO.pie == True: # pie binary... 만약에 main 이 없는경우라면?
 		gen_compilescript_for_piebinary(LOC, options.filename)
+
+	elif mainaddr == -1: # library 
+		gen_compilescript_for_sharedlibrary(LOC, options.filename)
 
 	else: # have main.. and not pie..!
 		gen_compilescript(LOC, options.filename)
