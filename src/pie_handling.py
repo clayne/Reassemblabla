@@ -337,15 +337,18 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 							ORIDISASM = resdic[Sname][SORTED_ADDRESS[i]][1]
 							
 							CODEBLOCK  = '\n'
+							CODEBLOCK += '   pushf\n'
 							CODEBLOCK += '   cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + '\n'
 							CODEBLOCK += '   je ' + symbolname_yes + '\n'
 							CODEBLOCK += '\n'
 							CODEBLOCK += '   ' + symbolname_no + ':' + '\n'
 							CODEBLOCK += '  ' + ORIDISASM + '\n'
+							CODEBLOCK += '   popf\n'
 							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
 							CODEBLOCK += '\n'
 							CODEBLOCK += '   ' + symbolname_yes + ':' + '\n'
 							CODEBLOCK += '  ' + NEWDISASM + '\n'
+							CODEBLOCK += '   popf\n'
 							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
 							CODEBLOCK += '\n'
 							# 오케이. 프린트해보자 이제.
@@ -389,15 +392,18 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 							
 							
 							CODEBLOCK  = '\n'
+							CODEBLOCK += '   pushf\n'
 							CODEBLOCK += '   cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + '\n'
 							CODEBLOCK += '   je ' + symbolname_yes + '\n'
 							CODEBLOCK += '\n'
 							CODEBLOCK += '   ' + symbolname_no + ':' + '\n'
 							CODEBLOCK += '  ' + ORIDISASM + '\n'
+							CODEBLOCK += '   popf\n'
 							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
 							CODEBLOCK += '\n'
 							CODEBLOCK += '   ' + symbolname_yes + ':' + '\n'
 							CODEBLOCK += '  ' + NEWDISASM + '\n'
+							CODEBLOCK += '   popf\n'
 							CODEBLOCK += '   jmp ' + symbolname_next + '\n'
 							CODEBLOCK += '\n'
 							# 오케이. 프린트해보자 이제.
