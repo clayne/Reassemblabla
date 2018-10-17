@@ -1,14 +1,5 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from elftools.elf.elffile import ELFFile
-from elftools.elf.dynamic import DynamicSection
-import sys
-import os
-import subprocess
-import re
-from optparse import OptionParser
-import binascii 
-from global_variables import *
 import requests
 import telegram
 
@@ -21,6 +12,10 @@ def SendTelegram(msgstr):
 	bot = telegram.Bot(token = my_token)   # bot 선언.
 	updates = bot.getUpdates()  # 업데이트
 	chat_id = bot.getUpdates()[-1].message.chat.id
-	bot.sendMessage(chat_id = chat_id, text=msgstr)
+	bot.sendMessage(chat_id = chat_id, text="[지원봇] " + msgstr)
+ 
 
-SendTelegram("잘되냐?")
+try:
+	SendTelegram("Telegram library loaded")
+except:
+	print "telegram error"

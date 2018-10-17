@@ -14,6 +14,29 @@ from global_variables import *
 def logging(mystr):
 	print " [*] " + str(mystr)
 
+
+def ldd(filename):
+	cmd = 'ldd ' + filename
+	res = subprocess.check_output(cmd, shell=True)
+	lines = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
+	libraries = []
+	for l in lines:
+		if '(' in l and ')' in l:
+			l = l.replace(l[l.index('('):l.index(')')+1], '') # (0xb7dae000) 같은 쓸데없는 정보 없애기
+
+		if 'linux-gate.so' in l: # 파일시스템에 없는 가상의 라이브러리는 제외
+			continue
+		elif 'ld-linux.so' in l: # 로더는 자동으로 붙으니 제외
+			continue
+		elif 'not found' in l: # 전체경로를 못찾은 라이브러리. 즉, 인풋바이너리와 같은 경로에 있는 라이브러리라던가..
+			# =>에서 왼쪽을 파싱
+			libraries.append(l.split('=>')[0].strip())
+		else:
+			# =>에서 오른쪽을 파싱
+			libraries.append(l.split('=>')[1].strip())
+	return libraries
+
+
 def get_soname(filename):
 	try:
 		out = subprocess.check_output(['objdump', '-p', filename])
@@ -262,8 +285,6 @@ def gen_assemblescript(LOC, filename):
 	ld -o dash_reassemblable -dynamic-linker /lib/ld-linux.so.2  /usr/lib/i386-linux-gnu/crti.o -lc dash_reassemblable.o /usr/lib/i386-linux-gnu/crtn.o
 	'''
 
-	cmd = 'ldd ' + filename
-	res = subprocess.check_output(cmd, shell=True)
 
 	onlyfilename = filename.split('/')[-1]
 	cmd  = ""
@@ -276,11 +297,10 @@ def gen_assemblescript(LOC, filename):
 	cmd += "-dynamic-linker /lib/ld-linux.so.2 "
 	cmd += "-lc "
 
-	libraries = res.splitlines() # 잠깐 라이브버리좀 붙이고 가겠슴. 
-	for i in xrange(len(libraries)):
-		if "=>" in libraries[i]:
-			cmd += libraries[i].split(' ')[2]
-			cmd += " "	
+	libraries = ldd(filename)
+	for l in libraries:
+		cmd += l
+		cmd += " "	
 
 	cmd += onlyfilename + "_reassemblable.o "
 	cmd += crts
@@ -295,20 +315,18 @@ def gen_assemblescript(LOC, filename):
 	os.system(cmd)
 
 def gen_compilescript_for_piebinary(LOC, filename):
-	cmd = 'ldd ' + filename
-	res = subprocess.check_output(cmd, shell=True)
-
 	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
 	cmd += "gcc -g -pie -o "
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "
-	lines = res.splitlines()
-	for i in xrange(len(lines)):
-		if "=>" in lines[i]:
-			cmd += lines[i].split(' ')[2]
-			cmd += " "
+
+	libraries = ldd(filename)
+	for l in libraries:
+		cmd += l
+		cmd += " "	
+
 	saved_filename = LOC + '/' + onlyfilename
 
 	f = open(saved_filename + "_compile.sh",'w')
@@ -319,8 +337,6 @@ def gen_compilescript_for_piebinary(LOC, filename):
 	os.system(cmd)
 
 def gen_compilescript_for_sharedlibrary(LOC, filename):
-	cmd = 'ldd ' + filename
-	res = subprocess.check_output(cmd, shell=True)
 
 	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
@@ -328,11 +344,12 @@ def gen_compilescript_for_sharedlibrary(LOC, filename):
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "
-	lines = res.splitlines()
-	for i in xrange(len(lines)):
-		if "=>" in lines[i]:
-			cmd += lines[i].split(' ')[2]
-			cmd += " "
+
+	libraries = ldd(filename)
+	for l in libraries:
+		cmd += l
+		cmd += " "	
+
 	saved_filename = LOC + '/' + onlyfilename
 
 	f = open(saved_filename + "_compile.sh",'w')
@@ -352,8 +369,6 @@ def gen_compilescript(LOC, filename):
 		/lib/ld-linux.so.2 (0x56623000)
 	'''
 
-	cmd = 'ldd ' + filename
-	res = subprocess.check_output(cmd, shell=True)
 
 	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
@@ -361,11 +376,12 @@ def gen_compilescript(LOC, filename):
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "
-	lines = res.splitlines()
-	for i in xrange(len(lines)):
-		if "=>" in lines[i]:
-			cmd += lines[i].split(' ')[2]
-			cmd += " "
+
+	libraries = ldd(filename)
+	for l in libraries:
+		cmd += l
+		cmd += " "	
+
 	saved_filename = LOC + '/' + onlyfilename
 
 	f = open(saved_filename + "_compile.sh",'w')
