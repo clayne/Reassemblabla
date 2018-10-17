@@ -18,7 +18,6 @@ from etc import *
 from symbolize import *
 from global_variables import *
 import stat
-from SendMSG import *
 
 # python Test2.py ~/coreutils/src/ /home/osboxes/coreutils/src
 # 설명 : [PATH1]에 위치한 리어셈블리 파일을 어셈블합니다.
@@ -29,7 +28,7 @@ def get_binary_file(mypath):
 	filelist = []
 	for filename in os.listdir(mypath):
 		filename_only = filename
-		filename = mypath + filename
+		filename = mypath + '/' + filename
 		if os.path.isfile(filename) and os.access(filename, os.X_OK):
 			filelist.append(filename_only)
 	return filelist
