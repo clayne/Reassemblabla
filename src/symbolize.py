@@ -33,8 +33,7 @@ def pltsection_sanitize(resdic):
 			for addr in resdic[SectionName].keys():
 				if resdic[SectionName][addr][0] == '':
 					# resdic[SectionName][addr][0] = 'XXX:'
-					"TODO: 뭔가 이상해... .plt.got 섹션에 XXX: 가 난무하게 되... 어........"
-					"TODO: __gmon_start__ 가 참조될수있도록 해줘야 해..."
+					'nono...'
 
 
 def global_symbolize_000section(dics_of_000, symtab_000):
@@ -77,7 +76,7 @@ def not_global_symbolize_datasection(resdic):
 		if SectionName in DataSections_IN_resdic: # 데이터 섹션이라면 
 			for addr in resdic[SectionName].keys():
 				if resdic[SectionName][addr][0] != '': # 심볼이 붙어있는데
-					if resdic[SectionName][addr][0].startswith('MYSYM_') == True:
+					if resdic[SectionName][addr][0].startswith(SYMPREFIX[0] + 'MYSYM_') == True:
 						"This is my symbol. :) PASS."
 					else:
 						spoiled = resdic[SectionName][addr][0]
@@ -87,7 +86,7 @@ def not_global_symbolize_datasection(resdic):
 						if SectionName == '.got': # 섹션네임이 got라면 외부에서 링킹받아와다 지금 로컬에 데이터가 있는상태다. 즉 로컬데이터가 의미있다는 거시다. 
 							continue
 						'''
-						spoiled = 'MYSYM_' + spoiled
+						spoiled = SYMPREFIX[0] + 'MYSYM_' + spoiled
 						resdic[SectionName][addr][0] = spoiled
 	return resdic	
 
@@ -131,6 +130,18 @@ def symbolize_textsection(resdic):
 	_to = AllSection_IN_resdic
 	
 	symbolcount = 0
+	print 'symbolize_textsection'
+	print 'symbolize_textsection'
+	print 'symbolize_textsection'
+	print 'symbolize_textsection'
+	print 'symbolize_textsection'
+	print 'symbolize_textsection'
+	print SYMPREFIX[0]
+	print SYMPREFIX[0]
+	print SYMPREFIX[0]
+	print SYMPREFIX[0]
+	print SYMPREFIX[0]
+	print SYMPREFIX[0]
 	
 	for section_from in _from:
 		if section_from not in resdic.keys(): # COMMENT: excepation handling 추가 @0903
@@ -148,7 +159,7 @@ def symbolize_textsection(resdic):
 								simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
 								resdic[section_to][ADDR_TO_SYM]
 							else: # else, create my symbol name 
-								simbolname = "MYSYM_"+str(symbolcount)
+								simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
 								symbolcount = symbolcount+1
 								resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
 							
@@ -194,7 +205,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 								if int(candidate,16) in resdic[section_to].keys(): # to 의 대상이되는 섹션
 									symbolname = resdic[section_to][int(candidate,16)][0]
 									if symbolname == '': 
-										symbolname = "MYSYM_DATA_"+str(symcnt)+":"
+										symbolname = SYMPREFIX[0] + "MYSYM_DATA_"+str(symcnt)+":"
 									resdic[section_from].pop(sorted_keylist[i+3])
 									resdic[section_from].pop(sorted_keylist[i+2])
 									resdic[section_from].pop(sorted_keylist[i+1])

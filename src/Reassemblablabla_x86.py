@@ -31,8 +31,7 @@ if __name__=="__main__":
 	parser.add_option("-c", "--comment", dest="comment", help="add bytepattern info as a comment", action="store_true")
 	parser.add_option("-d", "--datainsert", dest="datainsert", help="insert datas to data section", action="store_true")
 	parser.add_option("-l", "--location", dest="location", help="location to save result files")
-	
-
+	parser.add_option("-s", "--shrinksize", dest="shrinksize", help="shrink output binary size by disignate local symbol", action="store_true")
 	parser.set_defaults(verbose=True)
 	(options, args) = parser.parse_args()
 
@@ -45,7 +44,14 @@ if __name__=="__main__":
 		print "     --insert  : insert datas to data section" 
 		print "     --comment : add bytepattern info as a comment" 
 		print "     --location : denote location(directory) to save the result files" 
+		print "     --shrinksize : shrink output binary size by disignate local symbol" 
 		sys.exit(0)
+
+	if options.shrinksize is True: 
+		print '[*] Shirinking size...'
+		SYMPREFIX[0] = '.L' # 전역변수로써 접근해야하는데 로컬에서만 L이되서그런가?
+	else:
+		SYMPREFIX[0] = ''
 
 	if options.location is None:
 		LOC = '.'
@@ -109,7 +115,7 @@ if __name__=="__main__":
 	startaddr = findstart(options.filename)
 
 	if mainaddr == -1: 
-		resdic['.text'][startaddr][0] = "MYSYM_ENTRY:" # "_start:" 가 들어가면, 왠진모르겠지만 라이브러리의 call _start 에서 이상한 곳을 CALL 하게된다. 
+		resdic['.text'][startaddr][0] = SYMPREFIX[0] + "MYSYM_ENTRY:" # "_start:" 가 들어가면, 왠진모르겠지만 라이브러리의 call _start 에서 이상한 곳을 CALL 하게된다. 
 	else: 
 		resdic['.text'][mainaddr][0] = "main:"
 

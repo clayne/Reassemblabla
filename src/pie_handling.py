@@ -103,7 +103,7 @@ def PIE_calculated_addr_symbolize(resdic):
 								for target_section in resdic.keys():
 									if DESTINATION in resdic[target_section].keys()  and target_section in AllSections_WRITE: # fortunatly, DESTINATION hits on current target
 										if resdic[target_section][DESTINATION][0] == '': # symbol does not exist
-											simbolname  = 'MYSYM_PIE_' + str(count) 
+											simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
 											count += 1
 											resdic[target_section][DESTINATION][0] = simbolname + ':'
 										else:  # symbol exists already at there. 
@@ -133,7 +133,7 @@ def PIE_calculated_addr_symbolize(resdic):
 							for target_section in resdic.keys():
 								if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE:
 									if resdic[target_section][DESTINATION][0] == '':
-										simbolname  = 'MYSYM_PIE_' + str(count) 
+										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
 										count += 1
 										resdic[target_section][DESTINATION][0] = simbolname + ':'
 									else: 
@@ -164,7 +164,7 @@ def PIE_calculated_addr_symbolize(resdic):
 							for target_section in resdic.keys():
 								if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE:
 									if resdic[target_section][DESTINATION][0] == '':
-										simbolname  = 'MYSYM_PIE_' + str(count) 
+										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
 										count += 1
 										resdic[target_section][DESTINATION][0] = simbolname + ':'
 									else:
@@ -207,7 +207,7 @@ def PIE_calculated_addr_symbolize(resdic):
 							for target_section in resdic.keys():
 								if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE:
 									if resdic[target_section][DESTINATION][0] == '':
-										simbolname  = 'MYSYM_PIE_' + str(count) 
+										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
 										count += 1
 										resdic[target_section][DESTINATION][0] = simbolname + ':'
 									else:
@@ -239,7 +239,7 @@ def PIE_calculated_addr_symbolize(resdic):
 							for target_section in resdic.keys():
 								if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE:
 									if resdic[target_section][DESTINATION][0] == '':
-										simbolname  = 'MYSYM_PIE_' + str(count) 
+										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
 										count += 1
 										resdic[target_section][DESTINATION][0] = simbolname + ':'
 									else: 
@@ -317,17 +317,17 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 					for target_section in resdic.keys():
 						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
 							# 심볼이름 셋팅
-							symbolname_yes  = 'MYSYM_PIE_YES_'    + str(count)
-							symbolname_no   = 'MYSYM_PIE_NO_'     + str(count)
+							symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
+							symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
 							# symbolname_next = ???
 							if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
-								symbolname_next = 'MYSYM_PIE_ORIG_'   + str(count) 
+								symbolname_next = SYMPREFIX[0] + 'MYSYM_PIE_ORIG_'   + str(count) 
 								resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
 							else :
 								symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
 							# symbolname = ???
 							if resdic[target_section][DESTINATION][0] == '': 
-								symbolname = 'MYSYM_PIE_REMAIN_' + str(count)
+								symbolname = SYMPREFIX[0] + 'MYSYM_PIE_REMAIN_' + str(count)
 								resdic[target_section][DESTINATION][0] = symbolname + ':'
 							else:
 								symbolname = resdic[target_section][DESTINATION][0][:-1]
@@ -371,17 +371,17 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 					for target_section in resdic.keys():
 						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
 							# 심볼이름 셋팅
-							symbolname_yes  = 'MYSYM_PIE_YES_'    + str(count)
-							symbolname_no   = 'MYSYM_PIE_NO_'     + str(count)
+							symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
+							symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
 							# symbolname_next = ???
 							if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
-								symbolname_next = 'MYSYM_PIE_ORIG_'   + str(count) 
+								symbolname_next = SYMPREFIX[0] + 'MYSYM_PIE_ORIG_'   + str(count) 
 								resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
 							else :
 								symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
 							# symbolname = ???
 							if resdic[target_section][DESTINATION][0] == '': 
-								symbolname = 'MYSYM_PIE_REMAIN_' + str(count)
+								symbolname = SYMPREFIX[0] + 'MYSYM_PIE_REMAIN_' + str(count)
 								resdic[target_section][DESTINATION][0] = symbolname + ':'
 							else:
 								symbolname = resdic[target_section][DESTINATION][0][:-1]

@@ -403,15 +403,13 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
-
 	f.write(".section .got\n")
 	f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
 			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors', '.plt.got']
-			#SectionThatLoaderAutomaticallyAdds_data = ['.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
-			SectionThatLoaderAutomaticallyAdds_data = ['.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata'] # ---> 지금 이거 활성화함. 그래서 init_array, fini_array 가 그대로 갖다 박히게끔 했더니 segmentation fault 남.
+			SectionThatLoaderAutomaticallyAdds_data = ['.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
 			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
 				f.write("\n" + ".section " + ".text" + "\n")
 				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
