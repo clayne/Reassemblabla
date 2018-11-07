@@ -129,20 +129,7 @@ def symbolize_textsection(resdic):
 	_from = CodeSections_WRITE
 	_to = AllSection_IN_resdic
 	
-	symbolcount = 0
-	print 'symbolize_textsection'
-	print 'symbolize_textsection'
-	print 'symbolize_textsection'
-	print 'symbolize_textsection'
-	print 'symbolize_textsection'
-	print 'symbolize_textsection'
-	print SYMPREFIX[0]
-	print SYMPREFIX[0]
-	print SYMPREFIX[0]
-	print SYMPREFIX[0]
-	print SYMPREFIX[0]
-	print SYMPREFIX[0]
-	
+	symbolcount = 0	
 	for section_from in _from:
 		if section_from not in resdic.keys(): # COMMENT: excepation handling 추가 @0903
 			continue

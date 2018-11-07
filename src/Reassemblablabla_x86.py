@@ -16,6 +16,7 @@ from pwnlib.commandline import common
 
 from etc import *
 from symbolize import *
+from symbolize_lazy import *
 from binary2dic import *
 from align import *
 from linkerhandling import *
@@ -140,7 +141,7 @@ if __name__=="__main__":
 	
 
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
-	PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO)
+	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO)
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
 	for SectionName in CodeSections_WRITE:
@@ -178,6 +179,37 @@ if __name__=="__main__":
 			if len(resdic['.rodata'].values()[i][0]) != 0: # 만약에 심볼이있다면 데이터처음부분에 INSRTED DATA 를넣자
 				resdic['.rodata'].values()[i][1] = " .byte 0x49, 0x4e, 0x53, 0x45, 0x52, 0x54, 0x45, 0x44, 0x5f\n" + resdic['.rodata'].values()[i][1]
 	
+
+
+
+
+
+
+
+
+	add_stuffs(resdic, mainaddr) # 레이지리졸브에 필요한 백업함수를 추가하고, 그리구 main앞에 시그널핸들러를 등록하쟝
+
+	# 모든 점프에대해서 세그폴발생할수도있으니깐 우선 백업(레지스터랑 플래그레지스터)부터하쟝
+	jmp_to_PushalPushfJmp(resdic) 
+
+	# 모든 라인에 심볼을 붙인다
+	addLABEL_to_allLineofTextSection(resdic)
+
+	# 레이지 리졸버 함수덩어리를 추가한다
+	addLazyResolver2textSection(resdic)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	if options.comment is True:
 		gen_assemblyfile(LOC, resdic, options.filename, 1)

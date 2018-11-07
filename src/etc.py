@@ -398,7 +398,6 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 
 	f = open(saved_filename + "_reassemblable.s",'w')
 
-
 	f.write(".global main\n")
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치

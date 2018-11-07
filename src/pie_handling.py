@@ -255,7 +255,7 @@ def PIE_calculated_addr_symbolize(resdic):
 
 # leal.d32 -0x1334(%ebx), %edi // 이렇게 출처를 알수없는 ebx 나 edx 가 쓰일때는, if (GOT로 가정했을때) GOT-0x1334가 memory address에 fit 하면 --> 심볼라이즈, 아니라면 --> 안심볼라이즈 이렇게하자... 
 # TODO: PIE_calculate_remainedpointer_HEURISTICALLY 이함수를 Getpcthunk 안에서 콜하는 대상이 되는 베이직블락 안에서도 유효값을가지는 레지스터들을 킵 트래킹하도록 수정하기 . ls 디스어셈블해보면 -1(%ebx), %eax 도 MYSYM_PIE_REMAIN_0 으로 심볼라이즈하고 난리났다 아주..
-def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
+def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):  
 	# The Ultimate REGEX!
 	_ = '.*?'
 	p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # leal.d32 -3(%ebx), %eax
@@ -263,8 +263,6 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 	p_call  = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
 	p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
 	p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
-
-
 
 
 
@@ -278,8 +276,6 @@ def PIE_DynamicSymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 	count = 0 
 	# 우선은 libstdbuf.so 에서 사용하는 패턴인 lea, mov 만 가지고 해보자. 
 	SectionName = CodeSections_WRITE
-	print "\n\n\nPIE_DynamicSymbolize_GOTbasedpointer....."
-	print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 	for Sname in SectionName:
 		if Sname not in resdic.keys(): continue # 섹션이 없는경우에는 처리안해주고 걍 continue
 
