@@ -183,4 +183,31 @@ def addLazyResolver2textSection(resdic):
 
 	
 	resdic['.text'].update(dic_lazyresolver)
-	
+
+
+
+# call get_pc_thunk --> jmp
+def getpcthunk_to_returnoriginalADDR(resdic):
+	for sectionName in CodeSections_WRITE:
+		if sectionName in resdic.keys():
+			for i in xrange(len(sorted(resdic[sectionName].keys()))):
+				addr = sorted(resdic[sectionName].keys())[i]
+				if 'get_pc_thunk' in resdic[sectionName][addr][1] and 'call' in resdic[sectionName][addr][1] : # 1차 필터.
+						lines = resdic[sectionName][addr][1].split('\n') # 하나의 인스트럭션이 (블라블라처리를 거치면서) 멀티라인으로 되어있는경우가 있다. 
+						# call get_pc_thunk -> jmp get_pc_thunk 교체
+						for j in xrange(len(lines)):
+							if 'get_pc_thunk' in lines[j] and 'call' in lines[j] : # 2차 필터
+								nextaddr = sorted(resdic[sectionName].keys())[i+1]
+		
+								newl  = ''
+								newl +=  ' push $' + hex(nextaddr) + '\n'
+								newl += lines[j].replace('calll','jmp').replace('call','jmp')
+								lines[j] = newl
+						
+						# 재조립
+						for j in xrange(len(lines)):
+							newline = lines[j] + '\n' 
+
+						# 재조립된 디스어셈블리를 반영
+						resdic[sectionName][addr][1] = newline
+								

@@ -308,6 +308,8 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 				REGLIST = extract_register(DISASM)
 				INSTRUCTION = DISASM.split(' ')[1]
 
+				INSTRUCTION = 'lea' # 슬데없이 leaw 이따구로 디스어셈블하는 경우, leaw SYMBOLNAME, %eax 할때 truncate 되므로, 그냥 복잡 ㄴㄴ하게 lea로 바꾼다. 
+
 				if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
 					DESTINATION = GOT_baseaddr + ADD_VALUE 
 					for target_section in resdic.keys():
@@ -361,6 +363,8 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 				ADD_VALUE = extract_hex_addr(DISASM)[0]
 				REGLIST = extract_register(DISASM)
 				INSTRUCTION = DISASM.split(' ')[1]
+
+				INSTRUCTION = 'mov' # 슬데없이 movw 이따구로 디스어셈블하는 경우, movw SYMBOLNAME, %eax 할때 truncate 되므로, 그냥 복잡 ㄴㄴ하게 lea로 바꾼다. 
 
 				if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
 					DESTINATION = GOT_baseaddr + ADD_VALUE

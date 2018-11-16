@@ -86,7 +86,7 @@ def not_global_symbolize_datasection(resdic):
 						if SectionName == '.got': # 섹션네임이 got라면 외부에서 링킹받아와다 지금 로컬에 데이터가 있는상태다. 즉 로컬데이터가 의미있다는 거시다. 
 							continue
 						'''
-						spoiled = SYMPREFIX[0] + 'MYSYM_' + spoiled
+						spoiled = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + spoiled
 						resdic[SectionName][addr][0] = spoiled
 	return resdic	
 
@@ -288,4 +288,5 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 		for addr in resdic[SectionName].keys():
 			if 'REGISTER_WHO' in resdic[SectionName][addr][1]:
 				resdic[SectionName][addr][1] = resdic[SectionName][addr][1].replace('REGISTER_WHO', '%'+resdic[SectionName][addr][3])
+
 

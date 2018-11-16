@@ -230,7 +230,9 @@ def remove_brackets(dics_of_text):
 
 def eliminate_weird_GLOB_DAT(T_glob):
 	# GLOB_DAT 심볼일 자격이 없는얘들을 제명... 
-	# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다...
+	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']  
+
+	# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다... 이런것들이 더있으면 추가하라.
 	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
 	for key in T_glob.keys():
 		if T_glob[key] in eliminate: 
