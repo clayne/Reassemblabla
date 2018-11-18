@@ -81,77 +81,41 @@ if __name__=="__main__":
 	# ==테이블 셋팅== : .dynsym 은 처리안해줘도 된다. 왜냐하면 .rel.dyn과 .rel.plt에 포함되어있기 때문.
 	logging("get_relocation_tables")
 	T_rel = get_relocation_tables(options.filename)
-		
-
-
-
-
-
-
-
-
-
-
-
-	for kkkk in T_rel.keys():
-		for jjjj in T_rel[kkkk].keys():
-			print "{} : {}".format(hex(jjjj), T_rel[kkkk][jjjj])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 
 
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
-	eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT'])
+	# eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # TODO: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
 
 
 
 
-	# COMMENT: 1116 plt2name 에 __gmon_start__ 가 들어가있는경우가 있음. printf 처럼 plt로 접근함. 왜그런거지? 몰라. 
-	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
-	for key in T_rel['R_386_GLOB_DAT'].keys():
-		if T_rel['R_386_GLOB_DAT'][key] in eliminate:
-			del T_rel['R_386_GLOB_DAT'][key] 
-
-
-
-
-
+	# 이 직전에 .plt.got 부분이 더럽다면 jmpl *0xc(%ebx)이런시그로 점프하면 더럽거덩. 그러면 살짝 sanitizing을 하고가자. 
+	logging("now PIE_LazySymbolize_GOTbasedpointer_pltgot")
+	PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic)
 
 	# pie바이너리를 위한 테이블수정이 살짝 있겠습니다...
 	if CHECKSEC_INFO.pie == True:
-		concat_symbolname_to_TABLE(T_rel['R_386_GLOB_DAT'], '@GOT(REGISTER_WHO)')
-		concat_symbolname_to_TABLE(T_rel['R_386_JUMP_SLOT'], '@PLT')
-
-	T_plt2name = got2name_to_plt2name(T_rel['R_386_JUMP_SLOT'], CHECKSEC_INFO, resdic)# T_got2name 을 T_plt2name으로 바꾼다.
+		concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT(REGISTER_WHO)')
+		concat_symbolname_to_TABLE(T_rel['STT_FUNC'], '@PLT')
 
 
+	# T_got2name 을 T_plt2name으로 바꾼다.
+	T_plt2name = got2name_to_plt2name(T_rel['STT_FUNC'], CHECKSEC_INFO, resdic)
 
 
 
 
-	# ==심볼이름 레이블링==
-	# 레이블링 순서는 휘발성이강하고(weak) 국소적인 이름부터한다. 1. Relocation section table 2. Weak symbol 3. Global symbol
+
+
+	# ==심볼이름 레이블링==. 레이블링 순서는 휘발성이강하고(weak) 국소적인 이름부터한다. 1. Relocation section table 2. Weak symbol 3. Global symbol
 	logging("now labeling")
 	dynamic_symbol_labeling(resdic, T_plt2name) 
-	dynamic_symbol_labeling(resdic, T_rel['R_386_GLOB_DAT']) 
-	dynamic_symbol_labeling(resdic, T_rel['R_386_COPY']) 
+	dynamic_symbol_labeling(resdic, T_rel['STT_OBJECT']) 
+	########### dynamic_symbol_labeling(resdic, T_rel['STT_NOTYPE']) # STT_NOTYPE 은 절대심볼화안해줌 ㅋ 
+
 	pltsection_sanitize(resdic) # 이름없는 got로향하는 무의미한 plt 들에 XXX 라는 더미이름을 하사해 주겠노라
 
 
@@ -203,6 +167,7 @@ if __name__=="__main__":
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
 	logging("now PIE_LazySymbolize_GOTbasedpointer")
 	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO)
+
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
 	logging("now lfunc_remove_callweirdaddress")

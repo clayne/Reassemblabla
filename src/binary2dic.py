@@ -14,7 +14,7 @@ from etc import *
 from keystone import *
 from global_variables import *
 from elftools.elf.relocation import RelocationSection
-
+from elftools.elf.sections import SymbolTableSection
 
 def extract_OPCODE_and_OPCODEinModRM(hexified_i_byte):
 	prefix = ['f3', 'f2', 'f0', '2e', '36', '3e', '26', '64', '65', '66', '67']
@@ -488,9 +488,48 @@ def binarycode2dic(filename, SHTABLE):
 	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
 
-def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
-	RET = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 우선 바이너리의 심볼테이블에도(/bin/dash) 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 부족함...  
-	R_386 = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
+
+
+
+
+
+
+
+
+
+def get_DYNSYM_LIST(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
+
+	# STT_NOTYPE, STT_OBJECT, STT_FUNC, STT_SECTION, STT_FILE, STT_COMMON, STT_LOOS, STT_HIOS, STT_LOPROC, STT_HIPROC 등 졸라많음. 나중에 확장할때 참고. 
+	DYNSYM_LIST = {}
+
+	bin = ELFFile(open(filename,'rb')) 
+	for section in bin.iter_sections():
+		if not isinstance(section, SymbolTableSection):
+			continue
+		else:
+			if section.name == '.dynsym':
+				for symbol in section.iter_symbols():
+					if symbol.name != '':		
+						if symbol.entry.st_info['type'] == 'STT_FUNC':
+							DYNSYM_LIST[str(symbol.name)] = 'STT_FUNC'
+						elif symbol.entry.st_info['type'] == 'STT_OBJECT':
+							DYNSYM_LIST[str(symbol.name)] = 'STT_OBJECT'
+						elif symbol.entry.st_info['type'] == 'STT_NOTYPE':
+							DYNSYM_LIST[str(symbol.name)] = 'STT_NOTYPE'
+
+			elif section.name == '.symbol': # 섹션이름이 .symbol 이라면 우리의 고려대상이 아님. 우리의툴은 스트립된바이너리를 대상으로 하므로 ㅎㅎ 
+				'We do not need .symbol section :)'
+
+	return DYNSYM_LIST
+
+def get_relocation_tables(filename): # TODO: get_relocation_tables 함수이름 마음에안든다 바꿔라 
+	
+	DYNSYM_LIST = get_DYNSYM_LIST(filename)
+	
+	RELOSYM_LIST = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 우선 바이너리의 심볼테이블에도(/bin/dash) 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 부족함...  
+	RET = {'STT_FUNC':{}, 'STT_OBJECT':{}, 'STT_NOTYPE':{}}
+
+	R_TYPES = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
 
 	bin = ELFFile(open(filename,'rb'))
 	for section in bin.iter_sections():
@@ -499,16 +538,41 @@ def get_relocation_tables(filename): # 크오오.. 이렇게하면 알아서 다
 		else:
 			symtable = bin.get_section(section['sh_link']) # symtable = '.dynsym' 섹션임. sh_link 정보를가지고 어떤 섹션에 접근을 하는구나. 
 			for rel in section.iter_relocations():
-				# rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']
-				
-				_type = rel['r_info_type']
-
+				_type = rel['r_info_type'] # rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']
 				symbol = symtable.get_symbol(rel['r_info_sym'])
-
 				if symbol.name != '':
-					RET[R_386[_type]][rel['r_offset']] = symbol.name
+					RELOSYM_LIST[R_TYPES[_type]][rel['r_offset']] = symbol.name
+	'''
+	현재까지 RELOSYM_LIST 상태는 다음과 같다. 
+	R_386_COPY : {}
+	R_386_GLOB_DAT : {134518400 : __gmon_start__}
+	R_386_32 : {}
+	R_386_JUMP_SLOT : {134518416 : printf, 134518420 : __libc_start_main}
+	'''
+	for R_TYPE in RELOSYM_LIST.keys():
+		for ADDR in RELOSYM_LIST[R_TYPE].keys():
+			symname = RELOSYM_LIST[R_TYPE][ADDR]
+
+			if symname in DYNSYM_LIST.keys(): 
+				if DYNSYM_LIST[symname] is 'STT_FUNC':
+					RET['STT_FUNC'].update({ADDR:symname})
+				elif DYNSYM_LIST[symname] is 'STT_OBJECT':
+					RET['STT_OBJECT'].update({ADDR:symname})
+				elif DYNSYM_LIST[symname] is 'STT_NOTYPE': # STT_NOTYPE 에 해당하는것들중 대표적인게 _Jv_RegisterClasses 인데, 이런심볼은 심볼라이즈 안해줘야하는거 알지?
+					RET['STT_NOTYPE'].update({ADDR:symname})
 
 	return RET
+
+
+
+
+
+
+
+
+
+
+
 
 # input : 파일이름
 # output : '.rel.dyn' 등 특정섹션의 readelf -a 결과를 파싱해서 리턴함['001b1edc', '00069b06', 'R_386_GLOB_DAT', '001b2be8', '__progname_full'] 

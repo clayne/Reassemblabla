@@ -33,6 +33,7 @@ def PIE_set_getpcthunk_loc(resdic):
 #                                    아니라면 substitute되기때문에 소거되는 RegName을 memorial로다가 써줌
 def PIE_calculated_addr_symbolize(resdic):
 	SectionName = CodeSections_WRITE # 최종적으로 추가되는 코드색션
+	SectionName += []
 	count = 0
 	
 	for Sname in SectionName:
@@ -175,7 +176,8 @@ def PIE_calculated_addr_symbolize(resdic):
 								NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname
 								resdic[Sname][SORTED_ADDRESS[i]][1] = NEWDISASM	
 								print "       {}".format(NEWDISASM)
-								# resdic[Sname][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
+								# resdic[Sname][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군 COMMENT: GOT based 로다가 접근하는경우에 %ebx라는값이 중요한 역할을 함. 그래서 [3]에다가 저장하였따
+								resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
 
 
 
@@ -354,10 +356,6 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 							resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
 							print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
 
-
-
-
-
 			elif p_mov.match(DISASM) is not None:
 				# SETUP
 				ADD_VALUE = extract_hex_addr(DISASM)[0]
@@ -411,5 +409,47 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 							resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
 							print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
 					
+			# TODO: 아마도 백퍼센트 jmp 0x12(%ebx) call 0x12(%eax) 등등 처리안해줘서 문제생길것이다. 나중에 언젠가 regex들을 추가확장하자. 					
 					
-					
+
+
+# pie 바이너리같은경우 .plt.got의 항이 jmp *0x12341234 이게아니라 jmp *0xc(%ebx) 이러케생겼따. 그러니깐 이걸 걍 계산해가지고 심볼화해주자.  
+def PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic):
+	# The Ultimate REGEX!
+	_ = '.*?'
+	p_jmp   = re.compile(' jmp' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + '\(%' + _ + '\)') # jmpl.d32 *0xc(%ebx)
+
+	# 이 함수를 필요로하지않는경우 걍리턴 ㄱㄱ
+	if CHECKSEC_INFO.pie == False: return # PIE 아니면 이거돌릴필요X. 그만헤. (일반바이너리는 원래부터가 jmp *0x12341234 로 아주 straightforward함)
+	if '.plt.got' not in resdic.keys(): return # 섹션이 없는경우 그만헤  
+		  
+	# 계산을 위한 GOT_baseaddr 얻어오기 
+	if CHECKSEC_INFO.relro == 'Full': GOT_baseaddr = sorted(resdic['.got'].keys())[0]
+	else: GOT_baseaddr = sorted(resdic['.got.plt'].keys())[0]  # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
+
+	SectionDic = resdic['.plt.got']  
+	SORTED_ADDRESS = SectionDic.keys()
+	SORTED_ADDRESS.sort()
+		
+	for i in xrange(len(SORTED_ADDRESS)):
+		DISASM = SectionDic[SORTED_ADDRESS[i]][1]
+		if p_jmp.match(DISASM) is not None:
+			# SETUP
+			ADD_VALUE = extract_hex_addr(DISASM)[0]
+			REGLIST = extract_register(DISASM)
+			INSTRUCTION = DISASM.split(' ')[1]
+			DESTINATION = GOT_baseaddr + ADD_VALUE 
+
+			NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
+
+			print SectionDic[SORTED_ADDRESS[i]][1]
+			print NEWDISASM
+			print ''
+
+			SectionDic[SORTED_ADDRESS[i]][1] = NEWDISASM
+			SectionDic[SORTED_ADDRESS[i]][3] = REGLIST[0] # [3] 에다가 소거한 레지스터 저장해야겠따. 
+			
+
+			
+
+
