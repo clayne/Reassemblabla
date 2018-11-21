@@ -232,13 +232,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					_byte = binascii.hexlify(_scontents[_offset:_offset+1])
 					if _byte =='f3' : _rep = 'rep'
 					else : _rep = 'repne'
-					dics_of_text[int(i.address)] =  [
+					dics_of_text[int(i.address)] =  [[
 												'', 
 												_rep, 
 												'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + _byte,
 												'',
 												''
-												]
+												]]
 					_offset = _offset + 1 # 다음인스트럭션의 오프셋은 1 커졌다
 					_scontents  = _scontents[_offset:] 
 					_sbaseaddr  = _sbaseaddr + _offset 
@@ -335,13 +335,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				else:
 					"MY_mnemoonic has already set because of [BUG-B]"
 
-				dics_of_text[int(i.address)] =   [
+				dics_of_text[int(i.address)] =   [[
 											'', 
 											str(' ' + MY_mnemoonic + _displacement + ' ' + MY_op_str), 
 											'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + binascii.hexlify(i.bytes),
 											'',
 											''
-											]
+											]]
 				
 				_offset = _offset + i.size # 다음 오프셋을 설정 
 			
@@ -361,7 +361,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					"DEFFERENT because capstone cannot understans 'long' suffix... "
 				else:
 					if ORIG_ASSEMBLY != RE___ASSEMBLY:
-						"disabled"
+						"This function is Temroparlly disabled"
 						# p_rint "-----[LOG] DIFFERENT BETWEEN BINARY AND RE-ASSEMBLY-----"
 						# p_rint "* DISASM   : " + DISASSEMBLY_for_reassemble
 						# p_rint "* ORIG     : " + ORIG_ASSEMBLY
@@ -396,13 +396,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 		if _errorcode == 'default' or _errorcode == 'goto data':
 			if _sbaseaddr + _offset < _sendaddr : # 현재지점이 end address 지점을 넘어가부리면 안댐
 				_saddress = _sbaseaddr + _offset
-				dics_of_text[_saddress] = 	[
+				dics_of_text[_saddress] = 	[[
 											'', 
 											' .byte 0x' + binascii.hexlify(_scontents[_offset:_offset+1]), 
 											'#=> ' + 'ADDR:' + str(hex(_saddress)) + ' BYTE:' + binascii.hexlify(_scontents[_offset:_offset+1]),
 											'',
 											''
-											]
+											]]
 				
 				_offset    = _offset + 1 # 다음 오프셋을 설정
 				_scontents = _scontents[_offset:]
@@ -418,8 +418,8 @@ def binarydata2dic(filename):
 						   ('40123944':['디렉티브자리','pop %ebx'])
 														...	  }
 	'''
-	datadic = {}
-	retdic = {}
+	dics_of_data = {}
+	resdic = {}
 	
 	bin = ELFFile(open(filename,'rb'))
 	f = open(filename,'r')
@@ -434,38 +434,38 @@ def binarydata2dic(filename):
 			s_offset = bin.get_section_by_name(SectionName).header.sh_offset
 			s_size = bin.get_section_by_name(SectionName).header.sh_size
 			s_contents = binfile[s_offset:s_offset+s_size]
-			datadic = {} # initialize
+			dics_of_data = {} # initialize
 			for j in xrange(s_size):
 				addr   = s_start + j
 				offset = s_offset + j
 				_byte  = binascii.b2a_hex(binfile[offset])
-				datadic[addr] = [
+				dics_of_data[addr] = [[
 								'', 
 								" .byte 0x" + _byte, 
 								'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' +_byte, 
 								'',
 								''
-								]
-			retdic[SectionName] = datadic
+								]]
+			resdic[SectionName] = dics_of_data
 
 	# zero-fill-on-demand
 	zeroinit_section = ['.bss']
 	s_start = bin.get_section_by_name('.bss').header.sh_addr
 	s_offset = bin.get_section_by_name('.bss').header.sh_offset
 	s_size = bin.get_section_by_name('.bss').header.sh_size
-	datadic = {} # initialize 0x00 from sh_addr to sh_addr+sh_size
+	dics_of_data = {} # initialize 0x00 from sh_addr to sh_addr+sh_size
 	for j in xrange(s_size):
 		addr = s_start + j
-		datadic[addr] = [
+		dics_of_data[addr] = [[
 						'', 
 						" .byte 0x00",
 						'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' + '00', 
 						'',
 						''
-						]
-	retdic['.bss'] = datadic
+						]]
+	resdic['.bss'] = dics_of_data
 	
-	return retdic
+	return resdic
 
 # capstone 버전
 def binarycode2dic(filename, SHTABLE): 

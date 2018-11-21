@@ -19,20 +19,19 @@ def lfunc_remove_pseudoinstruction(dics_of_text):
 	'''
 	for i in range(0,len(dics_of_text)):
 		key = dics_of_text.keys()[i]
-		if "eiz" in dics_of_text.values()[i][1]: 
-			dics_of_text[key][1] = " nop"
+		if "eiz" in dics_of_text.values()[i][1][0]: 
+			dics_of_text[key][1][0] = " nop"
 			#dics_of_text.update({key:[dics_of_text.values()[i][0]," nop"]})
 
 # handle no needed jumps (8048419:"jne 8048420 <frame_dummy+0x10>") --> (8048419:"jne XXX") 
 def lfunc_remove_callweirdfunc(dics_of_text):
 	for i in range(0,len(dics_of_text)):
 		key = dics_of_text.keys()[i]
-		if "<" in dics_of_text.values()[i][1]:
-			l = dics_of_text.values()[i][1]
+		if "<" in dics_of_text.values()[i][1][0]:
+			l = dics_of_text.values()[i][1][0]
 			l_instname =l[:l[1:].index(' ')+1] # instruction name
 			l_funcname  = "XXX" 
-			dics_of_text[key][1] = l_instname+" "+l_funcname
-			#dics_of_text.update({key:[dics_of_text.values()[i][0],l_instname+" "+l_funcname]})
+			dics_of_text[key][1][0] = l_instname + " " + l_funcname
 
 			
 # case1) {'0x804832c':	' call  80482f0 <__libc_start_main@plt>'} <- 입력값(1개짜리 dic)
@@ -54,7 +53,7 @@ def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
 
 
 	for pltaddr in pltsection.keys():
-		gotaddr = extract_hex_addr(pltsection[pltaddr][1]) # jmp *0x8039234 에서 hex값 추출 
+		gotaddr = extract_hex_addr(pltsection[pltaddr][1][0]) # jmp *0x8039234 에서 hex값 추출 
 		if len(gotaddr) < 1: continue # plt 섹션에 명령어에도 push 1 이런 쓸모없는것들이 있거덩... 패스해...
 		gotaddr = gotaddr[0]
 		if gotaddr in T_got2name.keys():
@@ -96,12 +95,12 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
 			for ADDRESS in resdic[SectionName].keys():
-				DISASSEMBLY = resdic[SectionName][ADDRESS][1]
+				DISASSEMBLY = resdic[SectionName][ADDRESS][1][0]
 				GOT_addr_of_func = extract_hex_addr(DISASSEMBLY)
 				if len(GOT_addr_of_func) >= 1:
 					for j in xrange(len(GOT_addr_of_func)):
 						if GOT_addr_of_func[j] in resdic[VIA].keys(): # 3STEP LANDING : .text -> .plt.got -> .rel.dyn 
-							HEXFINAL = extract_hex_addr(resdic[VIA][GOT_addr_of_func[j]][1]) # .plt.got에서 jmp *0x8049ff4 하는 대상주소
+							HEXFINAL = extract_hex_addr(resdic[VIA][GOT_addr_of_func[j]][1][0]) # .plt.got에서 jmp *0x8049ff4 하는 대상주소
 							if len(HEXFINAL) < 1:
 								"언급된 HEX 값이 우연히 VIA 중간을 찍는 값인경우, VIA 의 disassembly가 nop(66 90)일 경우가 많다. 구럼헥스값없징."
 							else:
@@ -110,7 +109,7 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 									name = TABLE[HEXFINAL[0]]  # TODO: now handling..lib_addr 가 TABLE 에 없는경우가 있음. (<= 얘 뭐라는거냐? )
 									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j]),name)
 									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j])[2:],name)
-									resdic['.text'][ADDRESS][1] = DISASSEMBLY
+									resdic['.text'][ADDRESS][1][0] = DISASSEMBLY
 								else: 
 									print "==========="
 									print "Oh my god. there's no key inside .rel.dyn TABLE!"
@@ -118,7 +117,7 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 									print HEXFINAL[0]
 									print "disassembly"
 									print DISASSEMBLY
-									print resdic[VIA][GOT_addr_of_func[j]][1]
+									print resdic[VIA][GOT_addr_of_func[j]][1][0]
 									print GOT_addr_of_func[j]
 						
 					
@@ -165,8 +164,8 @@ def please_call_my_name___by_weaksymbol(dics_of_text):
 
 	for ADDRESS in dics_of_text.keys():
 		for realname in weak_symbols.keys():
-			if realname in dics_of_text[ADDRESS][1]:
-				dics_of_text[ADDRESS][1] = dics_of_text[ADDRESS][1].replace(realname, weak_symbols[realname])
+			if realname in dics_of_text[ADDRESS][1][0]:
+				dics_of_text[ADDRESS][1][0] = dics_of_text[ADDRESS][1][0].replace(realname, weak_symbols[realname])
 
 
 

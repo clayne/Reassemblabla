@@ -18,10 +18,12 @@ from global_variables import *
 def jmp_to_PushalPushfJmp(resdic):
 
 	for addr in resdic['.text'].keys():
-		if resdic['.text'][addr][1].startswith(' jmp'): # TODO: jmp, jne 등등도 다 바꿔줘야하구 call도 바꿔줘야함. 그후에 이 모두에 대해서 resolve함수를 마련해 줘야함. 
-			newasm = resdic['.text'][addr][1]
-			newasm = ' call MYSYM_pushal\n call MYSYM_pushf\n' + resdic['.text'][addr][1]
-			resdic['.text'][addr][1] = newasm
+		disasmlines = resdic['.text'][addr][1]
+		for j in xrange(len(disasmlines)):
+			if disasmlines.startswith(' jmp'): # TODO: jmp, jne 등등도 다 바꿔줘야하구 call도 바꿔줘야함. 그후에 이 모두에 대해서 resolve함수를 마련해 줘야함. 
+				newasm = resdic['.text'][addr][1]
+				newasm = ' call MYSYM_pushal\n call MYSYM_pushf\n' + resdic['.text'][addr][1]
+				resdic['.text'][addr][1] = newasm
 
 
 def addLABEL_to_allLineofTextSection(resdic):
