@@ -2,9 +2,12 @@ CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.plt.got']
 DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata'] # <.jcr> added for handling pie binary.
 AllSections_WRITE = CodeSections_WRITE + DataSections_WRITE
 
+MyNamedSymbol = ['main', '__x86.get_pc_thunk']
+
 CodeSections_IN_resdic = CodeSections_WRITE + ['.plt'] 
 DataSections_IN_resdic = DataSections_WRITE + ['.got.plt'] 
 AllSection_IN_resdic = CodeSections_IN_resdic + DataSections_IN_resdic
+
 
 # for gen_assemblescript... Why crtn
 # crts = "/usr/lib/i386-linux-gnu/crtn.o" # original...

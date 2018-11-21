@@ -87,7 +87,7 @@ if __name__=="__main__":
 
 
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
-	# eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # TODO: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
+	# eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # COMMENT: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
 
 
 
@@ -98,15 +98,14 @@ if __name__=="__main__":
 
 	# pie바이너리를 위한 테이블수정이 살짝 있겠습니다...
 	if CHECKSEC_INFO.pie == True:
-		concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT(REGISTER_WHO)')
-		concat_symbolname_to_TABLE(T_rel['STT_FUNC'], '@PLT')
-
+		concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT(REGISTER_WHO)') # TODO: 근데 굳이 GOT relative access 를 안해도 되잖아? -->아냐... GOT based access가 아니면 컴파일러가 불평해 
+		# concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT') 
+		# concat_symbolname_to_TABLE(T_rel['STT_FUNC'], '@PLT') # COMMENT : 이렇게 하면 링킹을 못해오는 경우가 발생. 그래서 그냥 @PLT 빼줬다. 
+		
 
 	# T_got2name 을 T_plt2name으로 바꾼다.
+	logging("now got2name_to_plt2name...")
 	T_plt2name = got2name_to_plt2name(T_rel['STT_FUNC'], CHECKSEC_INFO, resdic)
-
-
-
 
 
 
@@ -186,12 +185,20 @@ if __name__=="__main__":
 	fill_blanked_symbolname_toward_GOTSECTION(resdic)
 
 	# === stderr 를 MYSYM_stderr로 바꿔버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도댐)=== COMMENT:1116 data섹션에도 stderr가 박혀있고 .bss섹션에도 stderr가 박혀있는경우 재조립할때 동일한심볼이름 참조했다면서 에러남. 그래서 심볼이름에 섹션이름을 녹여넣도록했음. 
-	logging("now not_global_symbolize_datasection")
-	not_global_symbolize_datasection(resdic)
+	logging("now not_global_symbolize_ExternalLinkedSymbol")
+	not_global_symbolize_ExternalLinkedSymbol(resdic)
+
+
+
+
+
 
 	# ===getpcthunk 바로다음에는 add $_GLOBAL_OFFSET_TABLE_ 이 와야하므로 그부분만 좀 바꿔준다. [주의] add $0x123->$_GOT_ 가 되는데, 0x123은 PIE 에뮬레이션할때 사용됨. 따라서 이 작업은 모든작업이 끝난후에 하자. 
 	logging("now post_getpcthunk_handling")
 	post_getpcthunk_handling(resdic) 
+	
+
+
 
 	if options.align is True: 
 		if '.text' in resdic.keys():
@@ -233,9 +240,9 @@ if __name__=="__main__":
 
 
 	if options.comment is True:
-		gen_assemblyfile(LOC, resdic, options.filename, 1)
+		gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, 1)
 	else:
-		gen_assemblyfile(LOC, resdic, options.filename, 0)
+		gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, 0)
 
 
 

@@ -83,17 +83,16 @@ def PIE_calculated_addr_symbolize(resdic):
 					p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
 					p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
 
-					# reg[REGLIST[0]] != 0 이 조건 말고, 그냥 리스트에 더하거나 빼는걸로 가자~
 
 					# EMU_01 : [addl $0x19c7, %ebx]
-					# TODO: get_pc_thunk 바로뒤에 오는 add는 에뮬레이션만 해주되, NEWDISASM 로 바꾸지는 않는다. 
-					# TODO: 그리고 그후에 오는 add는 NEWDISASM으로 바꿔주긴 하되, add가 아니라 lea로 바꿔줘야 한다. 더해주는값을 심볼리제이션해주는게 아니라 결과값을 심볼리제이션하는 것이므로. 
+					# COMMENT: get_pc_thunk 바로뒤에 오는 add는 에뮬레이션만 해주되, NEWDISASM 로 바꾸지는 않는다.  --> COMMENT: 아냐. 바꿔야 해. 왜냐하면 get_pc_thunk에서 리턴하는 주소가 "원본바이너리에서의 주소"이므로 원본과 동일한오프셋으로 접근함으로서 크래시내야해.
+					# COMMENT: 아냐,,, 바꾸지 말아야 해.. 왜냐하면 movl __progname(%ebx), %eax 와 같이 GOT relative하게 접근하는 뭔가가있을때, ebx는 GOT 여야하기 때문이야... 
+					# COMMENT: 아! 그러면 바꾸고. 바꾸되, 레이지심볼화대상에 movl __progname(%ebx), %eax  를 추가하면되잖아?
 					if p_add.match(DISASM) is not None: 
 						if len(extract_hex_addr(DISASM)) > 0:
 							ADD_VALUE = extract_hex_addr(DISASM)[0]
 							REGLIST   = extract_register(DISASM)
 							INSTRUCTION = DISASM.split(' ')[1]
-	
 							if REGLIST[0] in reg.keys(): # 좌측의 레지스터가 keep tracking 하는 레지스터라면, 
 								reg[REGLIST[0]] += ADD_VALUE
 								DESTINATION = reg[REGLIST[0]]
@@ -223,7 +222,6 @@ def PIE_calculated_addr_symbolize(resdic):
 								print "       {}... We momorize [{}]...".format(NEWDISASM, resdic[Sname][SORTED_ADDRESS[i]][3])
 
 
-
 					elif p_mov.match(DISASM) is not None:
 						ADD_VALUE = extract_hex_addr(DISASM)
 						REGLIST = extract_register(DISASM)
@@ -255,8 +253,11 @@ def PIE_calculated_addr_symbolize(resdic):
 								print "       {}... We momorize [{}]...".format(NEWDISASM, resdic[Sname][SORTED_ADDRESS[i]][3])
 				print ""
 
+
+
+
+
 # leal.d32 -0x1334(%ebx), %edi // 이렇게 출처를 알수없는 ebx 나 edx 가 쓰일때는, if (GOT로 가정했을때) GOT-0x1334가 memory address에 fit 하면 --> 심볼라이즈, 아니라면 --> 안심볼라이즈 이렇게하자... 
-# TODO: PIE_calculate_remainedpointer_HEURISTICALLY 이함수를 Getpcthunk 안에서 콜하는 대상이 되는 베이직블락 안에서도 유효값을가지는 레지스터들을 킵 트래킹하도록 수정하기 . ls 디스어셈블해보면 -1(%ebx), %eax 도 MYSYM_PIE_REMAIN_0 으로 심볼라이즈하고 난리났다 아주..
 def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):  
 	# The Ultimate REGEX!
 	_ = '.*?'
@@ -266,14 +267,10 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO):
 	p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
 	p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
 
-
-
 	if CHECKSEC_INFO.relro == 'Full':
 		GOT_baseaddr = sorted(resdic['.got'].keys())[0]
 	else:
 		GOT_baseaddr = sorted(resdic['.got.plt'].keys())[0]  # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
-
-
 
 	count = 0 
 	# 우선은 libstdbuf.so 에서 사용하는 패턴인 lea, mov 만 가지고 해보자. 
@@ -421,33 +418,37 @@ def PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic):
 
 	# 이 함수를 필요로하지않는경우 걍리턴 ㄱㄱ
 	if CHECKSEC_INFO.pie == False: return # PIE 아니면 이거돌릴필요X. 그만헤. (일반바이너리는 원래부터가 jmp *0x12341234 로 아주 straightforward함)
-	if '.plt.got' not in resdic.keys(): return # 섹션이 없는경우 그만헤  
+	if '.plt.got' in resdic.keys() or '.plt' in resdic.keys():  # 섹션이 없는경우 그만헤   
 		  
-	# 계산을 위한 GOT_baseaddr 얻어오기 
-	if CHECKSEC_INFO.relro == 'Full': GOT_baseaddr = sorted(resdic['.got'].keys())[0]
-	else: GOT_baseaddr = sorted(resdic['.got.plt'].keys())[0]  # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
+		# 계산을 위한 GOT_baseaddr 얻어오기 
+		if CHECKSEC_INFO.relro == 'Full': 
+			GOT_baseaddr = sorted(resdic['.got'].keys())[0]
+			PLT_sectionName = '.plt.got'
+		else:
+			GOT_baseaddr = sorted(resdic['.got.plt'].keys())[0]  # gdb에서  _GLOBAL_OFFSET_TABLE 곳의 주소가 .got.plt 섹션의 시작주소임. 
+			PLT_sectionName = '.plt'
 
-	SectionDic = resdic['.plt.got']  
-	SORTED_ADDRESS = SectionDic.keys()
-	SORTED_ADDRESS.sort()
-		
-	for i in xrange(len(SORTED_ADDRESS)):
-		DISASM = SectionDic[SORTED_ADDRESS[i]][1]
-		if p_jmp.match(DISASM) is not None:
-			# SETUP
-			ADD_VALUE = extract_hex_addr(DISASM)[0]
-			REGLIST = extract_register(DISASM)
-			INSTRUCTION = DISASM.split(' ')[1]
-			DESTINATION = GOT_baseaddr + ADD_VALUE 
-
-			NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
-
-			print SectionDic[SORTED_ADDRESS[i]][1]
-			print NEWDISASM
-			print ''
-
-			SectionDic[SORTED_ADDRESS[i]][1] = NEWDISASM
-			SectionDic[SORTED_ADDRESS[i]][3] = REGLIST[0] # [3] 에다가 소거한 레지스터 저장해야겠따. 
+		SectionDic = resdic[PLT_sectionName]  
+		SORTED_ADDRESS = SectionDic.keys()
+		SORTED_ADDRESS.sort()
+			
+		for i in xrange(len(SORTED_ADDRESS)):
+			DISASM = SectionDic[SORTED_ADDRESS[i]][1]
+			if p_jmp.match(DISASM) is not None:
+				# SETUP
+				ADD_VALUE = extract_hex_addr(DISASM)[0]
+				REGLIST = extract_register(DISASM)
+				INSTRUCTION = DISASM.split(' ')[1]
+				DESTINATION = GOT_baseaddr + ADD_VALUE 
+	
+				NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
+	
+				print SectionDic[SORTED_ADDRESS[i]][1]
+				print NEWDISASM
+				print ''
+	
+				SectionDic[SORTED_ADDRESS[i]][1] = NEWDISASM
+				SectionDic[SORTED_ADDRESS[i]][3] = REGLIST[0] # [3] 에다가 소거한 레지스터 저장해야겠따. 
 			
 
 			

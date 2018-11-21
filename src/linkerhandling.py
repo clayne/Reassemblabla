@@ -41,8 +41,8 @@ def lfunc_remove_callweirdfunc(dics_of_text):
 
 
 def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
-	# full relo    : .text -> .plt.got -> puts@GOT.
-	# partial relo : .text -> .plt     -> puts@GOT.
+	# full relo    : .text -> .plt.got -> .got
+	# partial relo : .text -> .plt     -> .got.plt
 
 	T_plt2name = {}
 
@@ -52,21 +52,11 @@ def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
 	else:
 		pltsection = resdic['.plt']
 
-	# [02] PIE바이너리에서는 plt섹션에서 GOT가 마치 다이나믹한척함. 하지만 테이블에서 보여지는건 + _GLOBAL_OFFSET_TABLE_ 한 값이다. 참고 : https://blog.naver.com/eternalklaus/221365789660
-	_GLOBAL_OFFSET_TABLE_ = 0
-	if CHECKSEC_INFO.pie == True:
-		if CHECKSEC_INFO.relro == 'Full':
-			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'].keys())[0]
-		else:
-			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'].keys())[0]
 
 	for pltaddr in pltsection.keys():
 		gotaddr = extract_hex_addr(pltsection[pltaddr][1]) # jmp *0x8039234 에서 hex값 추출 
 		if len(gotaddr) < 1: continue # plt 섹션에 명령어에도 push 1 이런 쓸모없는것들이 있거덩... 패스해...
-
 		gotaddr = gotaddr[0]
-		gotaddr = _GLOBAL_OFFSET_TABLE_ + gotaddr
-
 		if gotaddr in T_got2name.keys():
 			T_plt2name[pltaddr] = T_got2name[gotaddr]
 
@@ -76,8 +66,8 @@ def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
 def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 	# 참고
 	'''
-	full relo    : .text -> .plt.got -> puts@GOT.   GOT의위치 가 [.rel.dyn]의 key가된다  
-	partial relo : .text -> .plt     -> puts@GOT.   GOT의위치 가 [.rel.plt]의 key가된다
+	full relo    : .text -> .plt.got -> puts (in GOT).   GOT의위치 가 [.rel.dyn]의 key가된다  
+	partial relo : .text -> .plt     -> puts (in GOT).   GOT의위치 가 [.rel.plt]의 key가된다
 	하지만 text 안에서는      === 얘의위치로써 puts 를 부른다. 
 	
 	그래서 === 를 부른다면, === 안에 jmp ??? 가 있다면,

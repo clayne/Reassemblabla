@@ -71,24 +71,30 @@ def post_getpcthunk_handling(resdic):
 					
 
 
-def not_global_symbolize_datasection(resdic):
+def not_global_symbolize_ExternalLinkedSymbol(resdic):
 	for SectionName in resdic.keys():
-		if SectionName in DataSections_IN_resdic: # 데이터 섹션이라면 
-			for addr in resdic[SectionName].keys():
-				if resdic[SectionName][addr][0] != '': # 심볼이 붙어있는데
-					if resdic[SectionName][addr][0].startswith(SYMPREFIX[0] + 'MYSYM_') == True:
-						"This is my symbol. :) PASS."
-					else:
-						spoiled = resdic[SectionName][addr][0]
-						if '@' in spoiled:
-							spoiled = spoiled[:spoiled.index('@')] + ':' # stderr@GOT(%ebx) 이런식으로 지어진 이름의 심볼. 즉, .got 안에 들어가 앉아있는 데이터셈볼 (RELocation Table 에서 R_386_GLOB_DAT 속성의 심볼임) 
-						'''
-						if SectionName == '.got': # 섹션네임이 got라면 외부에서 링킹받아와다 지금 로컬에 데이터가 있는상태다. 즉 로컬데이터가 의미있다는 거시다. 
-							continue
-						'''
+		for addr in resdic[SectionName].keys():
+			if resdic[SectionName][addr][0] != '': # 심볼이 붙어있는데
+				if resdic[SectionName][addr][0].startswith(SYMPREFIX[0] + 'MYSYM_') == True:
+					"This is my symbol. :) PASS."
+				else:
+					symbolname = resdic[SectionName][addr][0]
+					if '@' in symbolname:
+						spoiled = symbolname
+						spoiled = spoiled[:spoiled.index('@')] + ':' # stderr@GOT(%ebx) 이런식으로 지어진 이름의 심볼. 
 						spoiled = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + spoiled
 						resdic[SectionName][addr][0] = spoiled
-	return resdic	
+					elif 'MYSYM' not in symbolname:
+						flag_namedsymbol = 0
+						for pasSSs in MyNamedSymbol:
+							if pasSSs in symbolname:
+								flag_namedsymbol = 1
+								'Good. You Servived.'
+						if flag_namedsymbol is 0: # You are not permitted symbol name. ex)printf
+							spoiled = symbolname
+							spoiled = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + spoiled
+							resdic[SectionName][addr][0] = spoiled
+	return resdic		
 
 def getpcthunk_labeling(resdic):
 	# p_rint "PIE_symbolize_getpcthunk"
@@ -121,6 +127,20 @@ def getpcthunk_labeling(resdic):
 	return 	list(set(pcthunk_reglist)) # 중복 제거
 
 
+def VSA_is_memoryAddr_ornot(resdic, SectionName, ADDR, theHexValue):
+
+	theLine = resdic[SectionName][ADDR][1].replace('0x','')
+	theHexStr = str(hex(theHexValue)).replace('0x','')
+
+	i = theLine.index(theHexStr)
+	if theLine[i-1] == '$':
+		if theLine.startswith(' add') or theLine.startswith(' sub'):
+			return False 
+	
+	return True
+
+
+
 # 1. 우선은 헥스값을 발라내고
 # 2. 만약 딕셔너리에 그 헥스값이 있다면 심볼화
 # input : resdic
@@ -137,23 +157,24 @@ def symbolize_textsection(resdic):
 			addrlist = extract_hex_addr(resdic[section_from][ADDR][1])
 			if len(addrlist) >= 1:
 				for ADDR_TO_SYM in addrlist: 
-					for section_to in _to: # _from --> _to 
-						if section_to not in resdic.keys(): # COMMENT: excepation handling 추가 @0903 
-							continue
-						if ADDR_TO_SYM in resdic[section_to].keys(): 
-							# symbol name setting
-							if resdic[section_to][ADDR_TO_SYM][0] != "": # if symbol already exist
-								simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
-								resdic[section_to][ADDR_TO_SYM]
-							else: # else, create my symbol name 
-								simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
-								symbolcount = symbolcount+1
-								resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
-							
-							resdic[section_from][ADDR][1] = resdic[section_from][ADDR][1].replace(hex(ADDR_TO_SYM),simbolname)# 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-							resdic[section_from][ADDR][1] = resdic[section_from][ADDR][1].replace(hex(ADDR_TO_SYM)[2:],simbolname) # 그게아니라 8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-							p = re.compile('\<.*?\>') # 'call MYSYM_14 <fast_memcpy>' -> 'call MYSYM_14'. 심볼라이즈후에는 뒤에오는거제거해도된다. 심볼라이즈를안했을시에는 제거하면안된다. 나중에그걸기반으로 lfunc_remove_callweirdfunc 때릴꺼기때매
-							resdic[section_from][ADDR][1] =  re.sub(p, "", resdic[section_from][ADDR][1])
+					if VSA_is_memoryAddr_ornot(resdic, section_from, ADDR, ADDR_TO_SYM) is True: # 심볼라이즈를 하고싶은 주소 ADDR_TO_SYM 가 우리의 VSA결과 메모리주소라고 판단되었다면
+						for section_to in _to: # _from --> _to 
+							if section_to not in resdic.keys(): # COMMENT: excepation handling 추가 @0903 
+								continue
+							if ADDR_TO_SYM in resdic[section_to].keys(): 
+								# symbol name setting
+								if resdic[section_to][ADDR_TO_SYM][0] != "": # if symbol already exist
+									simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
+									resdic[section_to][ADDR_TO_SYM]
+								else: # else, create my symbol name 
+									simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
+									symbolcount = symbolcount+1
+									resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
+								
+								resdic[section_from][ADDR][1] = resdic[section_from][ADDR][1].replace(hex(ADDR_TO_SYM),simbolname)# 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+								resdic[section_from][ADDR][1] = resdic[section_from][ADDR][1].replace(hex(ADDR_TO_SYM)[2:],simbolname) # 그게아니라 8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+								p = re.compile('\<.*?\>') # 'call MYSYM_14 <fast_memcpy>' -> 'call MYSYM_14'. 심볼라이즈후에는 뒤에오는거제거해도된다. 심볼라이즈를안했을시에는 제거하면안된다. 나중에그걸기반으로 lfunc_remove_callweirdfunc 때릴꺼기때매
+								resdic[section_from][ADDR][1] =  re.sub(p, "", resdic[section_from][ADDR][1])
 	
 	
 	return resdic
@@ -284,9 +305,14 @@ def lfunc_remove_callweirdfunc(dics_of_text):
 			dics_of_text.update({key:[dics_of_text.values()[i][0],l_instname+" "+l_funcname]})
 
 def fill_blanked_symbolname_toward_GOTSECTION(resdic):
+	print ""
+	print ""
+	print ""
 	for SectionName in resdic.keys():
 		for addr in resdic[SectionName].keys():
 			if 'REGISTER_WHO' in resdic[SectionName][addr][1]:
+				print "------------------------------------REGISTER_WHO------------------------------------"
+				print resdic[SectionName][addr][1]
 				resdic[SectionName][addr][1] = resdic[SectionName][addr][1].replace('REGISTER_WHO', '%'+resdic[SectionName][addr][3])
-
+				print resdic[SectionName][addr][1]
 

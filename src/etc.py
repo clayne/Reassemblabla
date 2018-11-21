@@ -241,16 +241,6 @@ def eliminate_weird_GLOB_DAT(T_glob):
 def concat_symbolname_to_TABLE(T, concat):
 	for key in T.keys():
 		T[key] = T[key] + concat
-'''
-def set_symbolnameTABLE_for_GLOB_DAT(T_glob):
-	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
-	for key in T_glob.keys():
-		T_glob[key] = T_glob[key] + '@GOT(REGISTER_WHO)'
-
-def set_jumptable_toward_PLT(T_got2name):
-	for key in T_got2name.keys():
-		T_got2name[key] = T_got2name[key] + '@PLT'
-'''
 
 def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 테이블
 	SHTABLE = {}
@@ -393,7 +383,7 @@ def gen_compilescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_assemblyfile(LOC, resdic, filename, comment):
+def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 
 	saved_filename = LOC + '/' + onlyfilename
@@ -404,8 +394,14 @@ def gen_assemblyfile(LOC, resdic, filename, comment):
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
-	f.write(".section .got\n")
-	f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
+
+
+	if CHECKSEC_INFO.relro == 'Full':
+		f.write(".section .got\n")
+		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
+	else:
+		f.write(".section .got.plt\n")
+		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
