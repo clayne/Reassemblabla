@@ -33,6 +33,7 @@ def lfunc_remove_callweirdfunc(dics_of_text):
 			l_funcname  = "XXX" 
 			dics_of_text[key][1][0] = l_instname + " " + l_funcname
 
+ 
 			
 # case1) {'0x804832c':	' call  80482f0 <__libc_start_main@plt>'} <- 입력값(1개짜리 dic)
 #     => {'0x804832c':	' call  __libc_start_main>'} <- 출력값(1개짜리 dic)

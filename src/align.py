@@ -10,6 +10,7 @@ import re
 from optparse import OptionParser
 import binascii 
 from global_variables import *
+from etc import *
 
 def get_alignmentbyte(addr, type):
 	if type == 'data': # 데이터는 16 byte(SSE instruction),32 byte(AVX instruction), 64(AVX_512, intel의 특정 cpu line에서만 적용됨) 세 종류의 align
@@ -33,19 +34,25 @@ def get_alignmentbyte(addr, type):
 	return 0	
 
 def align_text(dics_of_text):
-	sorted_keylist = sorted(dics_of_text)
-	for i in xrange(len(sorted_keylist)):
-		# set line and next line
-		line = dics_of_text[sorted_keylist[i]][1]
-		if i == len(sorted_keylist)-1:line_next = "" #마지막 요소라면
-		else: line_next = dics_of_text[sorted_keylist[i+1]][1]
+	SORTED_ADDRESS = sorted(dics_of_text)
+	for i in xrange(len(SORTED_ADDRESS)):
+		# set disasm_1 and next disasm_1
+		orig_i = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[i]][1]) 
+		disasm_1 = dics_of_text[SORTED_ADDRESS[i]][1][orig_i]
+
+		if i == len(SORTED_ADDRESS)-1	:
+			disasm_2 = "" #마지막 요소라면
+		else: 
+			j = i+1
+			orig_j = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[j]][1])
+			disasm_2 = dics_of_text[SORTED_ADDRESS[j]][1]
 		
-		if "eiz" in line:
-			if "eiz" in line_next: 
-				dics_of_text[sorted_keylist[i]][1] = "" # eiz포함라인(현재라인)을 없앰
+		if "eiz" in disasm_1:
+			if "eiz" in disasm_2: 
+				dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = "" # eiz 포함라인(현재라인)을 없앰
 				continue
 			else: # 끝까지 갔다. 다음라인에 eiz없음 
-				align = get_alignmentbyte(sorted_keylist[i+1],'text')
+				align = get_alignmentbyte(SORTED_ADDRESS[j],'text')
 				if align == 32:
 					p2align = ".p2align 5,,31"
 				elif align == 16:
@@ -56,23 +63,22 @@ def align_text(dics_of_text):
 					p2align = ".p2align 2,,3"
 				else: # 다음라인이 align 이 안맞는다면, p2align을 추가해줄 필요가 없음
 					p2align = ""
-				dics_of_text[sorted_keylist[i]][1] = p2align
-				# 주의 : 이전라인의 뒤에 p2align을 추가해 줘야함. 왜냐하면, 현재라인에 추가하면 현재라인에 심볼이 있을경우 그 심볼로 접근했을때 align을 위한 바이트들도 몽땅 들어가서 접근이 되기 때문임.   
+				dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = p2align # 주의 : 이전라인의 뒤에 p2align을 추가해 줘야함. 왜냐하면, 현재라인에 추가하면 현재라인에 심볼이 있을경우 그 심볼로 접근했을때 align을 위한 바이트들도 몽땅 들어가서 접근이 되기 때문임.   
 	return dics_of_text		
 	
 def align_data(dics_of_data): # 데이터섹션에서, 만약에 Symbol이 있는데이터라면 align 맞춰주기
-	sorted_keylist = sorted(dics_of_data)
+	SORTED_ADDRESS = sorted(dics_of_data)
 	cannot_add_align_at_first = 0
-	for i in xrange(len(sorted_keylist)):
-		key = sorted_keylist[i]
+	for i in xrange(len(SORTED_ADDRESS)):
+
 		if cannot_add_align_at_first == 0: # don't care about the start of data section
-			cannot_add_align_at_first = 1
+			cannot_add_align_at_first = 1 
 			continue
-		if dics_of_data[key][0] != '': # symbol 을 가지고있다면
-			align = get_alignmentbyte(key,'data')
+		if dics_of_data[SORTED_ADDRESS[i]][0] != '': # symbol 을 가지고있다면
+			align = get_alignmentbyte(SORTED_ADDRESS[i],'data')
+
 			if align != 0:
-				# 위의 데이터 (이전데이터) 다음에 .align 을 붙인다.
-				ADDR_back = sorted_keylist[i-1]
-				dics_of_data[ADDR_back][1] = dics_of_data[ADDR_back][1] + "\n" + ".align " + str(align)
-				# dics_of_data.update({ADDR_back:[dics_of_data[ADDR_back][0], dics_of_data[ADDR_back][1] + "\n" + ".align " + str(align)]})
+				j = i-1 # 위의 데이터 (이전데이터) 다음에 .align 을 붙인다.
+				orig_j = pickpick_idx_of_orig_disasm(dics_of_data[SORTED_ADDRESS[j]][1])
+				dics_of_data[SORTED_ADDRESS[j]][1][orig_j] = dics_of_data[SORTED_ADDRESS[j]][1][orig_j] + "\n" + ".align " + str(align)
 	return dics_of_data

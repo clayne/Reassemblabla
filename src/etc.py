@@ -11,6 +11,16 @@ from optparse import OptionParser
 import binascii 
 from global_variables import *
 
+def list_insert(position, list1, list2):
+	return list1[:position] + list2 + list1[position:]
+
+def pickpick_idx_of_orig_disasm(theList):
+	for i in xrange(len(theList)):
+		if '#+++++' in theList[i]: continue
+		else: return i
+	return -1 # 모든 라인이 내가 추가해준 부분이다. 그럴경우 X( 를 리턴 
+
+
 def logging(mystr):
 	print " [*] " + str(mystr)
 
@@ -102,58 +112,7 @@ def extract_hex_addr(line):
 			
 	return addrlist
 
-def parseline(line, type): 
-	'''
-	usage)
-		input  : objdump 의 결과라인 한줄
-		'text'일 경우 : {1852: ' add %ebx,(%ebx)'} 
-		'data'일 경우 : {1852: ' .byte 0x01', 1853: ' .byte 0x1b'} 
-	'''
-	line = re.sub('\s+',' ',line).strip() # duplicate space, tab --> single space
-	addr_bytecode_inst = [line[:line.index(':')], line[line.index(':')+1:]] # 처음나오는 ':' 를 기준으로 왼쪽/오른쪽 나눔
-	
-	addr = int('0x'+addr_bytecode_inst[0],16) # base address
-	addr_encreasing = addr # 초기화
-	dic_data = {}
-	dic_text = {}
-	
-	addr_bytecode_inst[1] = addr_bytecode_inst[1].strip() # 주소가 아닌 값 
-	l2 = addr_bytecode_inst[1].split(' ') # .byte 0x30 0x40 이런경우 여러줄에걸쳐서 써주기위해 ' ' 단위로 쪼갬
-	stop = 0
-	i = 0
-	
-	l_code = ""
-	l_data = ""
-	l_mach = "#=> " # raw 기계어 코드 필드가 추가되었음
-	
-	while i<len(l2): 
-		if stop != 1: # data
-			if ishex(l2[i]) and len(l2[i]) == 2: # add 도 헥스데이터로 인식함..
-				l_data = " " + ".byte" + " " + "0x" + l2[i]
-				# l_mach += chr(int('0x'+l2[i],16))
-				l_mach += '0x' + l2[i] + " "
-				dic_data[addr_encreasing] = ['',
-											l_data,
-											'#=> ' + 'ADDR:' + str(hex(addr_encreasing)) + ' BYTE:'+ '0x'+l2[i],
-											'',
-											''
-											] # 딕셔너리에 쌍 추가
-				addr_encreasing = addr_encreasing + 1
-			else:
-				stop = 1
-				i = i-1
-		else: # code 일 경우 위에서 기껏 나눈거 다시 갖다가 붙인다
-				l_code += " " + l2[i]
-		i = i+1
-	dic_text[addr] = ['',l_code,l_mach] # 만든 string을 dic_text[addr] 에 추가
-	
-	if type == "data":
-		return dic_data
-	elif type == "text":
-		if '(bad)' in l_code: # text 안에 있는 data 라서 disassemble 이 잘 안된경우 걍 데이터로 박아버린다
-			return dic_data 
-		return dic_text 
-
+# URGENT: 마이그래이션 완료 
 def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 	# call __libc_start_main 이 아니라, call 0x8108213 (0x8108213 주소의 심볼 : __libc_start_main) 이더라도 main을 리턴할수 있게만 하면되지.
 	'''
@@ -167,51 +126,50 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 		
 		에서 0x804840b 를 리턴한다. 
 	'''
-	dics_of_text = resdic['.text']
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
 	i = 0
 	main = -1 # main 이 없다면 -1 리턴.. 
 	befoline = 'dummy line 000'
 
-	for addr in sorted(dics_of_text.iterkeys()):
-		line = dics_of_text[addr][1]
+	for ADDR in sorted(resdic['.text'].iterkeys()):
+		orig_i = pickpick_idx_of_orig_disasm(resdic['.text'][ADDR][1])
+		line = resdic['.text'][ADDR][1][orig_i]
 		if len(extract_hex_addr(line)) > 0:
-			suspect = extract_hex_addr(line)[0]
+			suspect = extract_hex_addr(line)[0] # 립씨스타트매인 주소가 언급되었냐?
 			if suspect == __libc_start_main_addr:
 				main = extract_hex_addr(befoline)[0]
 				break
 		befoline = line
 		
-
-	# pie 바이너리에는 .got  섹션 안에 main의 위치가 있었다. 
-	# 그래서 __libc_start_main 의 바로 위칸에서 원래는 push $main 을 해야할 때,
-	# push -0xc(%ebx) 를 하는 거시였다...
-	# 그러므로 나는 휴리스틱하게 -0xc(_GLOBAL_OFFSET_TABLE_) 에 있는 주소값을 읽어다가 리턴을 해줄 거시다. 
 	if CHECKSEC_INFO.relro == 'Full':
 		_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'].keys())[0]
 	else:
 		_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'].keys())[0]
 
 
-
-	if CHECKSEC_INFO.pie == True:
+	if CHECKSEC_INFO.pie == True: # pie 바이너리라면 libc_start_main 전에 pushl -0xc(%ebx)를 한다. got의 이주소에 main이 들어있다. 
 		mainaddr_is_in = _GLOBAL_OFFSET_TABLE_ + main
-		for addr in sorted(resdic['.got'].keys()):
-			if mainaddr_is_in == addr:
+		for ADDR in sorted(resdic['.got'].keys()):
+			if mainaddr_is_in == ADDR:
 				main  = ''
-				main += resdic['.got'][mainaddr_is_in+3][1]
-				main += resdic['.got'][mainaddr_is_in+2][1]
-				main += resdic['.got'][mainaddr_is_in+1][1]
-				main += resdic['.got'][mainaddr_is_in+0][1]
+				main += resdic['.got'][mainaddr_is_in+3][1][0]
+				main += resdic['.got'][mainaddr_is_in+2][1][0]
+				main += resdic['.got'][mainaddr_is_in+1][1][0]
+				main += resdic['.got'][mainaddr_is_in+0][1][0]
 				main = main.replace(' .byte 0x','')
 				main = int('0x' + main,16)
 
 	return main
 
+
+
+
+
 def findstart(file_name):
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
 	return entrypoint
 	
+# TODO: 함수 없애버리자. 
 def remove_brackets(dics_of_text):
 	'''
 	
@@ -227,13 +185,13 @@ def remove_brackets(dics_of_text):
 			dics_of_text.values()[i][1] = line[:index1] + line[index2+1:]
 		except:
 			"dummy"
-
+# TODO:이 함수 없애버리자. 애초에 UNKNOWN 심볼은 테이블에 추가되지도 않으니 
 def eliminate_weird_GLOB_DAT(T_glob):
 	# GLOB_DAT 심볼일 자격이 없는얘들을 제명... 
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']  
 
-	# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다... 이런것들이 더있으면 추가하라.
-	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
+	
+	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다... 이런것들이 더있으면 추가하라.
 	for key in T_glob.keys():
 		if T_glob[key] in eliminate: 
 			del T_glob[key]
@@ -383,6 +341,8 @@ def gen_compilescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
+
+# URGENT: 마이그래이션 함. 하지만 테스트는 아직 시점이안와서 안해봄
 def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 
@@ -421,13 +381,15 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 			else:
 				f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 			if comment == 1: 
-				#RANGES = len(resdic['.text'][resdic['.text'].keys()[0]]) # 사실상 걍4인데, array가 더추가될수도있응게..
-				RANGES = 3 #3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 어셈블도 안될텐데.
+				RANGES = 3 # 3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 그리고 이거추가하면 어셈블도 안됨.
 			else:
 				RANGES = 2
-			for address in sorted(resdic[sectionName].iterkeys()): #정렬
-				#for i in range(0,len(resdic[sectionName][address])): # 주석까지 프린트 하려면 활성화 해주길..
+			for ADDR in sorted(resdic[sectionName].iterkeys()): #정렬
 				for i in xrange(RANGES): 
-					if len(resdic[sectionName][address][i]) > 0: # 그냥 엔터만 아니면 됨 
-						f.write(resdic[sectionName][address][i]+"\n")
+					if len(resdic[sectionName][ADDR][i]) > 0: # 그냥 엔터만 아니면 됨 
+						if i == 1:
+							for j in xrange(len(resdic[sectionName][ADDR][i])):
+								f.write(resdic[sectionName][ADDR][i][j]+"\n")	
+						else:
+							f.write(resdic[sectionName][ADDR][i]+"\n")
 	f.close()

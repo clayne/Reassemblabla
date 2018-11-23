@@ -16,14 +16,14 @@ from global_variables import *
 
 
 def jmp_to_PushalPushfJmp(resdic):
-
 	for addr in resdic['.text'].keys():
-		disasmlines = resdic['.text'][addr][1]
-		for j in xrange(len(disasmlines)):
-			if disasmlines.startswith(' jmp'): # TODO: jmp, jne 등등도 다 바꿔줘야하구 call도 바꿔줘야함. 그후에 이 모두에 대해서 resolve함수를 마련해 줘야함. 
-				newasm = resdic['.text'][addr][1]
-				newasm = ' call MYSYM_pushal\n call MYSYM_pushf\n' + resdic['.text'][addr][1]
-				resdic['.text'][addr][1] = newasm
+		i = 0
+		while i < len(resdic['.text'][addr][1]):
+			if resdic['.text'][addr][1][i].startswith(' jmp'): # TODO: jmp, jne 등등도 다 바꿔줘야하구 call도 바꿔줘야함. 그후에 이 모두에 대해서 resolve함수를 마련해 줘야함. 
+				resdic['.text'][addr][1].insert(i,' call MYSYM_pushal #+++++')
+				resdic['.text'][addr][1].insert(i,' call MYSYM_pushf #+++++')
+				i += 2
+			i += 1
 
 
 def addLABEL_to_allLineofTextSection(resdic):
@@ -39,8 +39,8 @@ def addLABEL_to_allLineofTextSection(resdic):
 
 def add_stuffs(resdic, mainaddr):
 	asm_regbackup = '''
- # Register backup function
-
+ #+++++
+ 	# Register backup function
     .lcomm MYSYM_EFLAGS, 4 # .lcomm 선언하면 자동으로 .bss에 들어간다. 
     .lcomm MYSYM_EAX, 4
     .lcomm MYSYM_ECX, 4
@@ -84,9 +84,11 @@ MYSYM_popf:
     push MYSYM_EFLAGS
     popf
     ret
+#+++++
 	'''
 
 	asm_exit = '''
+#+++++
 # lazy resolver를 거쳐서도 해결안되는 심볼.. 즉, 애초부터 세그폴의 운명이였던 놈은 이곳으로 탈출해라.....
 
 MYSYM_EXIT:
@@ -116,32 +118,35 @@ MYSYM_EXIT:
 	addl $12, %esp
 
 # And... from now on, original main starts. 
+#+++++
 '''
-	noaddr = 0xff000000
+	noaddr = 0xf0000000
 	resdic['.text'][noaddr + 0] = [
 									'',
-									asm_regbackup,
+									[asm_regbackup],
 									'',
 									''
 									]
 
 	resdic['.text'][noaddr + 1] = [
 									'',
-									asm_exit,
+									[asm_exit],
 									'',
 									''
 									]
-	resdic['.text'][mainaddr][1] = asm_registerSignalHandler + resdic['.text'][mainaddr][1]
+
+	resdic['.text'][mainaddr][1] = resdic['.text'][mainaddr][1].insert(0,asm_registerSignalHandler) # 맨처음에 추가요 
 
 def addLazyResolver2textSection(resdic):
 	dic_lazyresolver = {}
 
 	# 우선은 text섹션에 대한 lazy resolver만 만들어 보자. 
-	noaddr = 0xf0000000 # 절대절대절대 바이너리가 맵핑될수없는 주소로 설정했음. 
+	noaddr = 0xf1000000 # 절대절대절대 바이너리가 맵핑될수없는 주소로 설정했음. 
 	count = 0
 
 	asm_Crashedaddr2Eax = '''
-	# Crash 유발한 바로 그 Addr을 %eax 에다가 집어넣는다
+#+++++
+# Crash 유발한 바로 그 Addr을 %eax 에다가 집어넣는다
 	mov 0x1c(%esp), %eax
 	add $0x5ec, %esp
 	'''
@@ -152,11 +157,12 @@ def addLazyResolver2textSection(resdic):
 	call MYSYM_popf
 	call MYSYM_popal
 	jmp %s
+#+++++
 	''' 
 
 	dic_lazyresolver[noaddr] = [
 								'MYSYM_LAZYRESOLVER_START:',
-								asm_Crashedaddr2Eax,
+								[asm_Crashedaddr2Eax],
 								'',
 								''
 								]
@@ -169,13 +175,13 @@ def addLazyResolver2textSection(resdic):
 		theAddr = str(hex(addr))
 
 		if i == len(resdic['.text'].keys()) - 1 : # 레이지리졸버 링크의 마지막임 
-			nextresolverName = 'MYSYM_EXIT' # TODO: exit함수 만들어줘야함. 와나 이거는 세그폴시그널핸들러의 최종보스필터까지도 뚫은 강력한 반항아다. 뒤져라. 
+			nextresolverName = 'MYSYM_EXIT' # 와나 이거는 세그폴시그널핸들러의 최종보스필터까지도 뚫은 강력한 반항아다. 뒤져라. 
 		else:
 			nextresolverName = 'MYSYM_LAZYRESOLVER_' + str(count + 1)
 
 		dic_lazyresolver[noaddr] = [
 							  'MYSYM_LAZYRESOLVER_' + str(count) + ':', # resolver의 각 항은 jne linked list 로 이어져 있다. 
-							  asm_lazyresolver % (theAddr, nextresolverName, theSymb[:-1]),
+							  [asm_lazyresolver % (theAddr, nextresolverName, theSymb[:-1])],
 							  '', # 주석자리. 노필요
 							  ''  # PIE관련정보 자리. 노필요.
 							  ]
@@ -194,22 +200,12 @@ def getpcthunk_to_returnoriginalADDR(resdic):
 		if sectionName in resdic.keys():
 			for i in xrange(len(sorted(resdic[sectionName].keys()))):
 				addr = sorted(resdic[sectionName].keys())[i]
-				if 'get_pc_thunk' in resdic[sectionName][addr][1] and 'call' in resdic[sectionName][addr][1] : # 1차 필터.
-						lines = resdic[sectionName][addr][1].split('\n') # 하나의 인스트럭션이 (블라블라처리를 거치면서) 멀티라인으로 되어있는경우가 있다. 
+				j = 0
+				while j < len(resdic[sectionName][addr][1]):
+					if 'get_pc_thunk' in resdic[sectionName][addr][1][j] and 'call' in resdic[sectionName][addr][1][j] : # 1차 필터.
 						# call get_pc_thunk -> jmp get_pc_thunk 교체
-						for j in xrange(len(lines)):
-							if 'get_pc_thunk' in lines[j] and 'call' in lines[j] : # 2차 필터
-								nextaddr = sorted(resdic[sectionName].keys())[i+1]
-		
-								newl  = ''
-								newl +=  ' push $' + hex(nextaddr) + '\n'
-								newl += lines[j].replace('calll','jmp').replace('call','jmp')
-								lines[j] = newl
-						
-						# 재조립
-						for j in xrange(len(lines)):
-							newline = lines[j] + '\n' 
-
-						# 재조립된 디스어셈블리를 반영
-						resdic[sectionName][addr][1] = newline
-								
+						nextaddr = sorted(resdic[sectionName].keys())[i+1]
+						resdic[sectionName][addr][1].insert(j,' push $' + str(hex(nextaddr))) # j 자리에다가 낑겨서 새치기함. 
+						resdic[sectionName][addr][1][j+1] = resdic[sectionName][addr][1][j+1].replace('calll','jmp').replace('call','jmp')
+						j += 1 # 새치기한것에 대한 보상
+					j += 1

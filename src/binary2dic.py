@@ -232,13 +232,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					_byte = binascii.hexlify(_scontents[_offset:_offset+1])
 					if _byte =='f3' : _rep = 'rep'
 					else : _rep = 'repne'
-					dics_of_text[int(i.address)] =  [[
+					dics_of_text[int(i.address)] =  [
 												'', 
-												_rep, 
+												[_rep], 
 												'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + _byte,
 												'',
 												''
-												]]
+												]
 					_offset = _offset + 1 # 다음인스트럭션의 오프셋은 1 커졌다
 					_scontents  = _scontents[_offset:] 
 					_sbaseaddr  = _sbaseaddr + _offset 
@@ -335,13 +335,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				else:
 					"MY_mnemoonic has already set because of [BUG-B]"
 
-				dics_of_text[int(i.address)] =   [[
+				dics_of_text[int(i.address)] =   [
 											'', 
-											str(' ' + MY_mnemoonic + _displacement + ' ' + MY_op_str), 
+											[str(' ' + MY_mnemoonic + _displacement + ' ' + MY_op_str)], 
 											'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + binascii.hexlify(i.bytes),
 											'',
 											''
-											]]
+											]
 				
 				_offset = _offset + i.size # 다음 오프셋을 설정 
 			
@@ -396,13 +396,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 		if _errorcode == 'default' or _errorcode == 'goto data':
 			if _sbaseaddr + _offset < _sendaddr : # 현재지점이 end address 지점을 넘어가부리면 안댐
 				_saddress = _sbaseaddr + _offset
-				dics_of_text[_saddress] = 	[[
+				dics_of_text[_saddress] = 	[
 											'', 
-											' .byte 0x' + binascii.hexlify(_scontents[_offset:_offset+1]), 
+											[' .byte 0x' + binascii.hexlify(_scontents[_offset:_offset+1])], 
 											'#=> ' + 'ADDR:' + str(hex(_saddress)) + ' BYTE:' + binascii.hexlify(_scontents[_offset:_offset+1]),
 											'',
 											''
-											]]
+											]
 				
 				_offset    = _offset + 1 # 다음 오프셋을 설정
 				_scontents = _scontents[_offset:]
@@ -439,13 +439,13 @@ def binarydata2dic(filename):
 				addr   = s_start + j
 				offset = s_offset + j
 				_byte  = binascii.b2a_hex(binfile[offset])
-				dics_of_data[addr] = [[
+				dics_of_data[addr] = [
 								'', 
-								" .byte 0x" + _byte, 
+								[' .byte 0x' + _byte], 
 								'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' +_byte, 
 								'',
 								''
-								]]
+								]
 			resdic[SectionName] = dics_of_data
 
 	# zero-fill-on-demand
@@ -456,13 +456,13 @@ def binarydata2dic(filename):
 	dics_of_data = {} # initialize 0x00 from sh_addr to sh_addr+sh_size
 	for j in xrange(s_size):
 		addr = s_start + j
-		dics_of_data[addr] = [[
+		dics_of_data[addr] = [
 						'', 
-						" .byte 0x00",
+						[' .byte 0x00'],
 						'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' + '00', 
 						'',
 						''
-						]]
+						]
 	resdic['.bss'] = dics_of_data
 	
 	return resdic

@@ -93,8 +93,9 @@ if __name__=="__main__":
 
 
 	# 이 직전에 .plt.got 부분이 더럽다면 jmpl *0xc(%ebx)이런시그로 점프하면 더럽거덩. 그러면 살짝 sanitizing을 하고가자. 
-	logging("now PIE_LazySymbolize_GOTbasedpointer_pltgot")
-	PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic)
+	if CHECKSEC_INFO.pie == True: # PIE 아니면 이거돌릴필요X. 그만헤. (일반바이너리는 원래부터가 jmp *0x12341234 로 아주 straightforward함)
+		logging("now PIE_LazySymbolize_GOTbasedpointer_pltgot")
+		PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic)
 
 	# pie바이너리를 위한 테이블수정이 살짝 있겠습니다...
 	if CHECKSEC_INFO.pie == True:
@@ -119,7 +120,6 @@ if __name__=="__main__":
 
 
 
-
 	# main 을 labeling 하기 위한 20줄에 걸친 몸부림..
 	__libc_start_main_addr = -1
 	for addr in T_plt2name.keys():
@@ -139,7 +139,9 @@ if __name__=="__main__":
 		resdic['.text'][mainaddr][0] = "main:"
 
 
+
 	# 심볼라이즈 전에 brackets를 다 제거해야징
+	# URGENT: 이거 안해도 될것같은데? 없어도 될듯..ㅋ 
 	logging("now remove_brackets")
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
@@ -172,11 +174,11 @@ if __name__=="__main__":
 	logging("now lfunc_remove_callweirdaddress")
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
-			lfunc_remove_callweirdaddress(resdic[SectionName])
+			lfunc_change_callweirdaddress_2_callXXX(resdic[SectionName])
 
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
-			lfunc_change_loop_call_jmp_and_hexvalue_instruction_to_data(resdic[SectionName])
+			lfunc_change_callweirdaddress_2_data(resdic[SectionName])
 	
 
 
@@ -194,9 +196,10 @@ if __name__=="__main__":
 
 
 	# ===getpcthunk 바로다음에는 add $_GLOBAL_OFFSET_TABLE_ 이 와야하므로 그부분만 좀 바꿔준다. [주의] add $0x123->$_GOT_ 가 되는데, 0x123은 PIE 에뮬레이션할때 사용됨. 따라서 이 작업은 모든작업이 끝난후에 하자. 
-	logging("now post_getpcthunk_handling")
-	post_getpcthunk_handling(resdic) 
-	
+	'''
+	logging("now post_getpcthunk_handling") 
+	post_getpcthunk_handling(resdic) # 이거 안씀. 왜냐하면 ebx 가 리어셈블된바이너리의 GOT를 가리킬경우, 크래시가 안나기때무님 ㅎㅅㅎ 그래두 언제쓸지모르니깐 우선은 두자구
+	'''
 
 
 
