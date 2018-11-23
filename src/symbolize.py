@@ -53,18 +53,19 @@ def post_getpcthunk_handling(resdic):
 		if SectionName in CodeSections_WRITE: # 코드섹션이라면
 			addrlist = sorted(resdic[SectionName]) 
 			for i in xrange(len(addrlist) - 1):
-				orig_i = pickpick_idx_of_orig_disasm(resdic[SectionName][addrlist[i]][1])
-				orig_j = pickpick_idx_of_orig_disasm(resdic[SectionName][addrlist[i + 1]][1])
-
-				if '__x86.get_pc_thunk.' in resdic[SectionName][addrlist[i]][1][orig_i]:
-					if 'call' in resdic[SectionName][addrlist[i]][1][orig_i] or 'jmp' in resdic[SectionName][addrlist[i]][1][orig_i]:  # getpcthunk_to_returnoriginalADDR 에 의해 push ???; ***jmp*** get_pc_thunk 로 바뀐경우도 핸들링
-						if 'add' in resdic[SectionName][addrlist[i+1]][1][orig_j]:
-							DISASM = resdic[SectionName][addrlist[i+1]][1][orig_j]
-							if '$' and ',' in DISASM: #add $MYSYM_745, %ebx
-								TRASH = DISASM[DISASM.index('$')+1:DISASM.index(',')]
-								DISASM = DISASM.replace(TRASH, '_GLOBAL_OFFSET_TABLE_')
-								resdic[SectionName][addrlist[i+1]][1][orig_j] = DISASM
-					
+				orig_i_list = pickpick_idx_of_orig_disasm(resdic[SectionName][addrlist[i]][1])
+				orig_j_list = pickpick_idx_of_orig_disasm(resdic[SectionName][addrlist[i + 1]][1])
+				for orig_i in orig_i_list:
+					for orig_j in orig_j_list:
+						if '__x86.get_pc_thunk.' in resdic[SectionName][addrlist[i]][1][orig_i]:
+							if 'call' in resdic[SectionName][addrlist[i]][1][orig_i] or 'jmp' in resdic[SectionName][addrlist[i]][1][orig_i]:  # getpcthunk_to_returnoriginalADDR 에 의해 push ???; ***jmp*** get_pc_thunk 로 바뀐경우도 핸들링
+								if 'add' in resdic[SectionName][addrlist[i+1]][1][orig_j]:
+									DISASM = resdic[SectionName][addrlist[i+1]][1][orig_j]
+									if '$' and ',' in DISASM: #add $MYSYM_745, %ebx
+										TRASH = DISASM[DISASM.index('$')+1:DISASM.index(',')]
+										DISASM = DISASM.replace(TRASH, '_GLOBAL_OFFSET_TABLE_')
+										resdic[SectionName][addrlist[i+1]][1][orig_j] = DISASM
+							
 
 
 def not_global_symbolize_ExternalLinkedSymbol(resdic):
@@ -126,22 +127,19 @@ def getpcthunk_labeling(resdic):
 					j += 1
 	return 	list(set(pcthunk_reglist)) # 중복 제거
 
-def VSA_is_memoryAddr_ornot(resdic, SectionName, ADDR, i, theHexValue):
+def VSA_is_memoryAddr_ornot(resdic, SectionName, ADDR, orig_i, theHexValue):
 	# resdic[SectionName][ADDR][1] 중에서 original line 만을 pick한다. 
 	# 왜냐면 VSA에는 내가 추가한 라인이아니라, 오로지 원본바이너리의 원본라인만을 취하여 VSA해야하기 때문이다. 
 
-	orig_i = pickpick_idx_of_orig_disasm(resdic[SectionName][ADDR][1])
-
-	if i is not orig_i:
-		return False # TODO: 내가 시스템상에서 디스어셈블과정에서 추가한 라인의 경우, 아묻따 먹금함. VSA 결과 심볼라이즈 안해야할 주소로 처리함. 근데 이렇게해줘도 될까? 나중에 룰점 고쳐야겠다 
 
 	theLine = resdic[SectionName][ADDR][1][orig_i].replace('0x','')
 	theHexStr = str(hex(theHexValue)).replace('0x','')
 	h = theLine.index(theHexStr)
+
 	if theLine[h-1] == '$':
 		if theLine.startswith(' add') or theLine.startswith(' sub'):
 			return False 
-	
+		
 	return True
 
 
@@ -157,29 +155,27 @@ def symbolize_textsection(resdic):
 		for section_to in _to:
 			if section_from in resdic.keys() and section_to in resdic.keys():
 				for ADDR in resdic[section_from].keys(): 
-					i = 0
-					while i < len(resdic[section_from][ADDR][1]):
-						addrlist = extract_hex_addr(resdic[section_from][ADDR][1][i])
-						if len(addrlist) >= 1:
-							for ADDR_TO_SYM in addrlist: 
-								if VSA_is_memoryAddr_ornot(resdic, section_from, ADDR, i, ADDR_TO_SYM) is True: # 심볼라이즈를 하고싶은 주소 ADDR_TO_SYM 가 우리의 VSA결과 메모리주소라고 판단되었다면
-									for section_to in _to: # _from --> _to 
-										if section_to not in resdic.keys(): # COMMENT: excepation handling 추가 @0903 
-											continue
-										if ADDR_TO_SYM in resdic[section_to].keys(): 
-											# symbol name setting
-											if resdic[section_to][ADDR_TO_SYM][0] != "": # if symbol already exist
-												simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
-											else: # else, create my symbol name 
-												simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
-												symbolcount = symbolcount + 1
-												resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
-											
-											resdic[section_from][ADDR][1][i] = resdic[section_from][ADDR][1][i].replace(hex(ADDR_TO_SYM),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-											resdic[section_from][ADDR][1][i] = resdic[section_from][ADDR][1][i].replace(hex(ADDR_TO_SYM)[2:],simbolname) # 그게아니라 8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-											p = re.compile('\<.*?\>') # 'call MYSYM_14 <fast_memcpy>' -> 'call MYSYM_14'. 심볼라이즈후에는 뒤에오는거제거해도된다. 심볼라이즈를안했을시에는 제거하면안된다. 나중에그걸기반으로 lfunc_remove_callweirdfunc 때릴꺼기때매
-											resdic[section_from][ADDR][1][i] =  re.sub(p, "", resdic[section_from][ADDR][1][i])
-						i += 1
+					orig_i_list = pickpick_idx_of_orig_disasm(resdic[section_from][ADDR][1])
+					for orig_i in orig_i_list:
+						addrlist = extract_hex_addr(resdic[section_from][ADDR][1][orig_i])
+						for ADDR_TO_SYM in addrlist: 
+							if VSA_is_memoryAddr_ornot(resdic, section_from, ADDR, orig_i, ADDR_TO_SYM) is True: # 심볼라이즈를 하고싶은 주소 ADDR_TO_SYM 가 우리의 VSA결과 메모리주소라고 판단되었다면
+								for section_to in _to: # _from --> _to 
+									if section_to not in resdic.keys(): # COMMENT: excepation handling 추가 @0903 
+										continue
+									if ADDR_TO_SYM in resdic[section_to].keys(): 
+										# symbol name setting
+										if resdic[section_to][ADDR_TO_SYM][0] != "": # if symbol already exist
+											simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
+										else: # else, create my symbol name 
+											simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
+											symbolcount = symbolcount + 1
+											resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
+										
+										resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(ADDR_TO_SYM),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+										resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(ADDR_TO_SYM)[2:],simbolname) # 그게아니라 8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+										p = re.compile('\<.*?\>') # 'call MYSYM_14 <fast_memcpy>' -> 'call MYSYM_14'. 심볼라이즈후에는 뒤에오는거제거해도된다. 심볼라이즈를안했을시에는 제거하면안된다. 나중에그걸기반으로 lfunc_remove_callweirdfunc 때릴꺼기때매
+										resdic[section_from][ADDR][1][orig_i] =  re.sub(p, "", resdic[section_from][ADDR][1][orig_i])
 
 	return resdic
 
@@ -244,27 +240,27 @@ def lfunc_change_callweirdaddress_2_callXXX(dics_of_text):
 	for i in xrange(len(dics_of_text)):
 		ADDR = dics_of_text.keys()[i]
 
-		orig_i = pickpick_idx_of_orig_disasm(dics_of_text[ADDR][1])
-		if orig_i == -1: # 만약에 모든 라인이 내가 시스템상으로 추가해준라인이라면
-			continue
+		orig_i_list = pickpick_idx_of_orig_disasm(dics_of_text[ADDR][1])
+		
+		for orig_i in orig_i_list:
 
-		elements = dics_of_text[ADDR][1][orig_i].split(' ')
-		yes_it_is_branch_instruction = 0
-
-		if len(elements) >= 3:
-			if elements[2].startswith('0x'):
-				elements[2] = elements[2][2:]
-			
-			if ishex(elements[2]): 			   #          jmp 12f2 <--here
-				for b in branch_inst:
-					if b in elements[1]: yes_it_is_branch_instruction = 1
+			elements = dics_of_text[ADDR][1][orig_i].split(' ')
+			yes_it_is_branch_instruction = 0
+	
+			if len(elements) >= 3:
+				if elements[2].startswith('0x'):
+					elements[2] = elements[2][2:]
 				
-				if yes_it_is_branch_instruction == 1: # here --> jmp 12f2
-					elements[2] = 'XXX'
-					line = '' # 다시 재조립
-					for i in xrange(len(elements)):
-						line = line + elements[i] + ' '
-					dics_of_text[ADDR][1][orig_i] = line 
+				if ishex(elements[2]): 			   #          jmp 12f2 <--here
+					for b in branch_inst:
+						if b in elements[1]: yes_it_is_branch_instruction = 1
+					
+					if yes_it_is_branch_instruction == 1: # here --> jmp 12f2
+						elements[2] = 'XXX'
+						line = '' # 다시 재조립
+						for i in xrange(len(elements)):
+							line = line + elements[i] + ' '
+						dics_of_text[ADDR][1][orig_i] = line 
 
 
 
@@ -276,28 +272,29 @@ def lfunc_change_callweirdaddress_2_data(dics_of_text):
 	
 	for i in xrange(len(dics_of_text)):
 		ADDR = dics_of_text.keys()[i]
-		orig_i = pickpick_idx_of_orig_disasm(dics_of_text[ADDR][1])
-		if orig_i == -1: continue
 
-		elements = dics_of_text[ADDR][1][orig_i].split(' ')
-		
-		yes_it_is_branch_instruction = 0
-		if len(elements) >= 3:
-			if '0x' in elements[2]:
-				elements[2] = elements[2].replace('0x','')
-				elements[2] = elements[2].replace('*', '')
-				elements[2] = elements[2].replace('$', '') 
+		orig_i_list = pickpick_idx_of_orig_disasm(dics_of_text[ADDR][1])
+		for orig_i in orig_i_list:
+
+			elements = dics_of_text[ADDR][1][orig_i].split(' ')
 			
-			if ishex(elements[2]): 			          # jmp 12f2 <--here
-				for INSTR in branch_inst:
-					if INSTR in elements[1]:
-						yes_it_is_branch_instruction = 1
-
-				if yes_it_is_branch_instruction == 1: # here --> jmp 12f2
-					bytepattern = dics_of_text[ADDR][2].split('BYTE:')[1]
-					line_data = ' .byte '
-					for j in xrange(len(bytepattern)/2):
-						line_data += '0x' + bytepattern[j*2:j*2+2] + ', '
-					line_data = line_data[:-2]
-					dics_of_text[ADDR][1][orig_i] = line_data
+			yes_it_is_branch_instruction = 0
+			if len(elements) >= 3:
+				if '0x' in elements[2]:
+					elements[2] = elements[2].replace('0x','')
+					elements[2] = elements[2].replace('*', '')
+					elements[2] = elements[2].replace('$', '') 
+				
+				if ishex(elements[2]): 			          # jmp 12f2 <--here
+					for INSTR in branch_inst:
+						if INSTR in elements[1]:
+							yes_it_is_branch_instruction = 1
+	
+					if yes_it_is_branch_instruction == 1: # here --> jmp 12f2
+						bytepattern = dics_of_text[ADDR][2].split('BYTE:')[1]
+						line_data = ' .byte '
+						for j in xrange(len(bytepattern)/2):
+							line_data += '0x' + bytepattern[j*2:j*2+2] + ', '
+						line_data = line_data[:-2]
+						dics_of_text[ADDR][1][orig_i] = line_data
 

@@ -15,10 +15,13 @@ def list_insert(position, list1, list2):
 	return list1[:position] + list2 + list1[position:]
 
 def pickpick_idx_of_orig_disasm(theList):
+	origList = []
 	for i in xrange(len(theList)):
-		if '#+++++' in theList[i]: continue
-		else: return i
-	return -1 # 모든 라인이 내가 추가해준 부분이다. 그럴경우 X( 를 리턴 
+		if '#+++++' in theList[i]: 
+			continue
+		else: 
+			origList.append(i)
+	return origList # 모든 라인이 내가 추가해준 부분이다. 그럴경우 X( 를 리턴 
 
 
 def logging(mystr):
@@ -132,14 +135,17 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 	befoline = 'dummy line 000'
 
 	for ADDR in sorted(resdic['.text'].iterkeys()):
-		orig_i = pickpick_idx_of_orig_disasm(resdic['.text'][ADDR][1])
-		line = resdic['.text'][ADDR][1][orig_i]
-		if len(extract_hex_addr(line)) > 0:
-			suspect = extract_hex_addr(line)[0] # 립씨스타트매인 주소가 언급되었냐?
-			if suspect == __libc_start_main_addr:
-				main = extract_hex_addr(befoline)[0]
-				break
-		befoline = line
+		orig_i_list = pickpick_idx_of_orig_disasm(resdic['.text'][ADDR][1])
+		for orig_i in orig_i_list:
+			line = resdic['.text'][ADDR][1][orig_i]
+			if len(extract_hex_addr(line)) > 0:
+				suspect = extract_hex_addr(line)[0] # 립씨스타트매인 주소가 언급되었냐?
+				if suspect == __libc_start_main_addr:
+					main = extract_hex_addr(befoline)[0]
+					break
+			befoline = line
+		if main != -1:
+			break
 		
 	if CHECKSEC_INFO.relro == 'Full':
 		_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'].keys())[0]

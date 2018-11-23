@@ -25,8 +25,10 @@ def PIE_set_getpcthunk_loc(resdic):
 		SORTED_ADDRESS = SectionDic.keys()
 		SORTED_ADDRESS.sort()
 		for i in xrange(len(SORTED_ADDRESS)):
-			orig_i = pickpick_idx_of_orig_disasm(SectionDic[SORTED_ADDRESS[i]][1])
-			if orig_i == -1: continue
+			orig_i_list = pickpick_idx_of_orig_disasm(SectionDic[SORTED_ADDRESS[i]][1])
+
+			if len(orig_i_list) is 0 : continue
+			orig_i = orig_i_list[0] # 대충 첨나오는얘가 원래바이너리의원래주소겠거니 하고 [0]으로 해준거,,, 알아서 나중에 오류나면 고쳐라 .
 			DISASM = SectionDic[SORTED_ADDRESS[i]][1][orig_i]
 			if '__x86.get_pc_thunk' in DISASM:
 				EIP = str(SORTED_ADDRESS[i+1])
@@ -53,194 +55,193 @@ def PIE_calculated_addr_symbolize(resdic):
 		# for i in xrange(len(SORTED_ADDRESS)): #COMMENT: 이거 내가 손봐줬음. 문제생기면 다시 살리자. 
 		while i < len(SORTED_ADDRESS) - 1:
 			i += 1 
-			orig_i = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1]) 
+			orig_i_list = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1])
+			for orig_i in orig_i_list:
 
-			DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_i]
-			
-			if '__x86.get_pc_thunk' in DISASM:
-				slice_count = 0
-
-				reg = {} # 자, 레지스터 에뮬레이션 준비~~ 
-
-				REG_STHX = DISASM[DISASM.index('get_pc_thunk.') + len('get_pc_thunk.'):]
-				REG_STHX = REG_STHX[REG_STHX.index('.')+1:]
-				REG_STHX = 'e' + REG_STHX
-				BASE = int(resdic[sectionName_1][SORTED_ADDRESS[i]][3]) # == EIP
-				
-				reg[REG_STHX] = BASE
-				print "==========================================================="
-				print "[{}] {} : {} ---{}---> {}              [[[START]]]".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM,REG_STHX,hex(reg[REG_STHX]))
-				slice_count += 1
-
-
-				while 1: # 코드 슬라이싱 시작	 
-					i += 1
-					if i >= len(SORTED_ADDRESS): break # DISASM 을 설정하기위한 최소한의조건 충족안되면 break
-
-
-
-					orig_j = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1]) 
-
-
-
-					DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j]
-
-					# 코드슬라이싱을 끝내는 조건 
-					if 'ret' in DISASM: break   # 베이직블락 끝나면 break
-					if 'get_pc_thunk' in DISASM: break # 또다른 블락의 시작이되면 break 
-
-					# The Ultimate REGEX!
-					_ = '.*?'
-					p_add   = re.compile(' add' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # add $0x1b53, %ebx
-					p_sar   = re.compile(' sar' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # sar $0x2, %ebx
-					p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # leal.d32 -3(%ebx), %eax
-					p_mov   = re.compile(' mov' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # movl.d32 -3(%ebx), %eax
-					p_call  = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
-					p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
-					p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
-
-
-					# EMU_01 : [addl $0x19c7, %ebx]
-					if p_add.match(DISASM) is not None: 
-						if len(extract_hex_addr(DISASM)) > 0:
-							ADD_VALUE = extract_hex_addr(DISASM)[0]
-							REGLIST   = extract_register(DISASM)
-							INSTRUCTION = DISASM.split(' ')[1]
-							if REGLIST[0] in reg.keys(): # 좌측의 레지스터가 keep tracking 하는 레지스터라면, 
-								reg[REGLIST[0]] += ADD_VALUE
-								DESTINATION = reg[REGLIST[0]]
+				DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_i]
+				if '__x86.get_pc_thunk' in DISASM:
+					slice_count = 0
+	
+					reg = {} # 자, 레지스터 에뮬레이션 준비~~ 
+	
+					REG_STHX = DISASM[DISASM.index('get_pc_thunk.') + len('get_pc_thunk.'):]
+					REG_STHX = REG_STHX[REG_STHX.index('.')+1:]
+					REG_STHX = 'e' + REG_STHX
+					BASE = int(resdic[sectionName_1][SORTED_ADDRESS[i]][3]) # == EIP
+					
+					reg[REG_STHX] = BASE
+					print "==========================================================="
+					print "[{}] {} : {} ---{}---> {}              [[[START]]]".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM,REG_STHX,hex(reg[REG_STHX]))
+					slice_count += 1
+	
+	
+					while 1: # 코드 슬라이싱 시작	 
+						i += 1
+						if i >= len(SORTED_ADDRESS): break # DISASM 을 설정하기위한 최소한의조건 충족안되면 break
+	
+	
+	
+						orig_j_list = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1]) 
+						for orig_j in orig_j_list:
+	
+							DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j]
 		
-								print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
-								slice_count += 1
-								found_target = 0
-								for sectionName_2 in resdic.keys():
-									if DESTINATION in resdic[sectionName_2].keys()  and sectionName_2 in AllSections_WRITE: # fortunatly, DESTINATION hits on current target
-										if resdic[sectionName_2][DESTINATION][0] == '': # symbol does not exist
-											simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
-											count += 1
-											resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
-										else:  # symbol exists already at there. 
-											simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
-										found_target = 1
-										break
-								if found_target == 1 and sectionName_2 in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다. 
-									INSTRUCTION = 'lea'
-									NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[0]
-									resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
-									print "       {}".format(NEWDISASM)
-									# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
-
-					# EMU_02 : [calll.d32 *-0xf8(%ebx, %edi, 4)]
-					elif p_call.match(DISASM) is not None:
-						ADD_VALUE = extract_hex_addr(DISASM)[0]
-						MULI_VALUE = extract_hex_addr(DISASM)[1]
-						REGLIST = extract_register(DISASM)
-						INSTRUCTION = DISASM.split(' ')[1]
-
-						if REGLIST[0] in reg.keys() and REGLIST[1] in reg.keys():
-							DESTINATION = reg[REGLIST[0]] + (reg[REGLIST[1]]*MULI_VALUE) + ADD_VALUE
-
-							print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
-							slice_count += 1
-							found_target = 0
-							for sectionName_2 in resdic.keys():
-								if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
-									if resdic[sectionName_2][DESTINATION][0] == '':
-										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
-										count += 1
-										resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
-									else: 
-										simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
-									found_target = 1
-									break
-							if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
-								NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + simbolname
-								resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
-								print "       {}".format(NEWDISASM)
-								# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
-
-					# EMU_03 : [pushl.d32 -0xc(%ebx)] 
-					elif p_push.match(DISASM) is not None:
-						ADD_VALUE       = extract_hex_addr(DISASM)
-						REGLIST         = extract_register(DISASM)
-						INSTRUCTION = DISASM.split(' ')[1]
-						if len(ADD_VALUE) == 0: ADD_VALUE = 0 # 걍 push %ebx 일수도 있자나?
-						else: ADD_VALUE = ADD_VALUE[0]
-
-						if REGLIST[0] in reg.keys(): # 레지스터가 keep tracking 하는 레지스터라면 
-							# reg[REGLIST[1]] = reg[REGLIST[0]] + ADD_VALUE # 레지스터 값의 변화는 없음  
-							DESTINATION = reg[REGLIST[0]] + ADD_VALUE
-
-							print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
-							slice_count += 1
-							found_target = 0
-							for sectionName_2 in resdic.keys():
-								if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
-									if resdic[sectionName_2][DESTINATION][0] == '':
-										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
-										count += 1
-										resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
-									else:
-										simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
-									found_target = 1
-									break
-							if found_target == 1 and sectionName_2 in AllSections_WRITE:
-								NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname
-								resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM	
-								print "       {}".format(NEWDISASM)
-								# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군 COMMENT: GOT based 로다가 접근하는경우에 %ebx라는값이 중요한 역할을 함. 그래서 [3]에다가 저장하였따
-								resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
-
-
-
-					elif p_sar.match(DISASM) is not None:
-						REGLIST   = extract_register(DISASM)
-						if REGLIST[0] in reg.keys(): del reg[REGLIST[0]] # reg deverts The Demension. Delete it. 
-
-					elif p_xor.match(DISASM) is not None:
-						REGLIST   = extract_register(DISASM)
-						if REGLIST[0] == REGLIST[1]:
-							reg[REGLIST[0]] = 0
-
-
-					# EMU_02 : [lea -0xf4(%ebx),%esi] / [mov -0xf4(%ebx),%esi] 
-					elif p_lea.match(DISASM) is not None or p_mov.match(DISASM) is not None:
-						ADD_VALUE       = extract_hex_addr(DISASM)
-						REGLIST         = extract_register(DISASM)
-						
-						if len(ADD_VALUE) == 0: ADD_VALUE = 0 # 걍 lea %ebx, %eax 일수도 있자나?
-						else:ADD_VALUE = ADD_VALUE[0]
-						
-						if REGLIST[0] in reg.keys(): # 좌측의 레지스터가 keep tracking 하는 레지스터라면, 
-							DESTINATION     = reg[REGLIST[0]] + ADD_VALUE 
-							# Setting instruction and EmulationMemory
-							if p_lea.match(DISASM) is not None:
-								INSTRUCTION = 'lea'
-								reg[REGLIST[1]] = DESTINATION 
-							elif p_mov.match(DISASM) is not None:
-								INSTRUCTION = 'mov'
-							 	if REGLIST[1] in reg.keys() : del reg[REGLIST[1]] # Stop tracking... out of same DEMENTION
-							
-							print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
-							slice_count += 1
-							found_target = 0
-							for sectionName_2 in resdic.keys():
-								if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
-									if resdic[sectionName_2][DESTINATION][0] == '':
-										simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
-										count += 1
-										resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
-									else:
-										simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
-									found_target = 1
-									break
-							if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
-								NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[1]
-								resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
-								resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
-								print "       {}... We momorize [{}]...".format(NEWDISASM, resdic[sectionName_1][SORTED_ADDRESS[i]][3])
-
-				print ""
+							# 코드슬라이싱을 끝내는 조건 
+							if 'ret' in DISASM: break   # 베이직블락 끝나면 break
+							if 'get_pc_thunk' in DISASM: break # 또다른 블락의 시작이되면 break 
+		
+							# The Ultimate REGEX!
+							_ = '.*?'
+							p_add   = re.compile(' add' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # add $0x1b53, %ebx
+							p_sar   = re.compile(' sar' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # sar $0x2, %ebx
+							p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # leal.d32 -3(%ebx), %eax
+							p_mov   = re.compile(' mov' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # movl.d32 -3(%ebx), %eax
+							p_call  = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
+							p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
+							p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
+		
+		
+							# EMU_01 : [addl $0x19c7, %ebx]
+							if p_add.match(DISASM) is not None: 
+								if len(extract_hex_addr(DISASM)) > 0:
+									ADD_VALUE = extract_hex_addr(DISASM)[0]
+									REGLIST   = extract_register(DISASM)
+									INSTRUCTION = DISASM.split(' ')[1]
+									if REGLIST[0] in reg.keys(): # 좌측의 레지스터가 keep tracking 하는 레지스터라면, 
+										reg[REGLIST[0]] += ADD_VALUE
+										DESTINATION = reg[REGLIST[0]]
+				
+										print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
+										slice_count += 1
+										found_target = 0
+										for sectionName_2 in resdic.keys():
+											if DESTINATION in resdic[sectionName_2].keys()  and sectionName_2 in AllSections_WRITE: # fortunatly, DESTINATION hits on current target
+												if resdic[sectionName_2][DESTINATION][0] == '': # symbol does not exist
+													simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
+													count += 1
+													resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
+												else:  # symbol exists already at there. 
+													simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
+												found_target = 1
+												break
+										if found_target == 1 and sectionName_2 in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+											INSTRUCTION = 'lea'
+											NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[0]
+											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+											print "       {}".format(NEWDISASM)
+											# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
+		
+							# EMU_02 : [calll.d32 *-0xf8(%ebx, %edi, 4)]
+							elif p_call.match(DISASM) is not None:
+								ADD_VALUE = extract_hex_addr(DISASM)[0]
+								MULI_VALUE = extract_hex_addr(DISASM)[1]
+								REGLIST = extract_register(DISASM)
+								INSTRUCTION = DISASM.split(' ')[1]
+		
+								if REGLIST[0] in reg.keys() and REGLIST[1] in reg.keys():
+									DESTINATION = reg[REGLIST[0]] + (reg[REGLIST[1]]*MULI_VALUE) + ADD_VALUE
+		
+									print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
+									slice_count += 1
+									found_target = 0
+									for sectionName_2 in resdic.keys():
+										if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
+											if resdic[sectionName_2][DESTINATION][0] == '':
+												simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
+												count += 1
+												resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
+											else: 
+												simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
+											found_target = 1
+											break
+									if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+										NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + simbolname
+										resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+										print "       {}".format(NEWDISASM)
+										# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
+		
+							# EMU_03 : [pushl.d32 -0xc(%ebx)] 
+							elif p_push.match(DISASM) is not None:
+								ADD_VALUE       = extract_hex_addr(DISASM)
+								REGLIST         = extract_register(DISASM)
+								INSTRUCTION = DISASM.split(' ')[1]
+								if len(ADD_VALUE) == 0: ADD_VALUE = 0 # 걍 push %ebx 일수도 있자나?
+								else: ADD_VALUE = ADD_VALUE[0]
+		
+								if REGLIST[0] in reg.keys(): # 레지스터가 keep tracking 하는 레지스터라면 
+									# reg[REGLIST[1]] = reg[REGLIST[0]] + ADD_VALUE # 레지스터 값의 변화는 없음  
+									DESTINATION = reg[REGLIST[0]] + ADD_VALUE
+		
+									print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
+									slice_count += 1
+									found_target = 0
+									for sectionName_2 in resdic.keys():
+										if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
+											if resdic[sectionName_2][DESTINATION][0] == '':
+												simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
+												count += 1
+												resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
+											else:
+												simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
+											found_target = 1
+											break
+									if found_target == 1 and sectionName_2 in AllSections_WRITE:
+										NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname
+										resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM	
+										print "       {}".format(NEWDISASM)
+										# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군 COMMENT: GOT based 로다가 접근하는경우에 %ebx라는값이 중요한 역할을 함. 그래서 [3]에다가 저장하였따
+										resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
+		
+		
+		
+							elif p_sar.match(DISASM) is not None:
+								REGLIST   = extract_register(DISASM)
+								if REGLIST[0] in reg.keys(): del reg[REGLIST[0]] # reg deverts The Demension. Delete it. 
+		
+							elif p_xor.match(DISASM) is not None:
+								REGLIST   = extract_register(DISASM)
+								if REGLIST[0] == REGLIST[1]:
+									reg[REGLIST[0]] = 0
+		
+		
+							# EMU_02 : [lea -0xf4(%ebx),%esi] / [mov -0xf4(%ebx),%esi] 
+							elif p_lea.match(DISASM) is not None or p_mov.match(DISASM) is not None:
+								ADD_VALUE       = extract_hex_addr(DISASM)
+								REGLIST         = extract_register(DISASM)
+								
+								if len(ADD_VALUE) == 0: ADD_VALUE = 0 # 걍 lea %ebx, %eax 일수도 있자나?
+								else:ADD_VALUE = ADD_VALUE[0]
+								
+								if REGLIST[0] in reg.keys(): # 좌측의 레지스터가 keep tracking 하는 레지스터라면, 
+									DESTINATION     = reg[REGLIST[0]] + ADD_VALUE 
+									# Setting instruction and EmulationMemory
+									if p_lea.match(DISASM) is not None:
+										INSTRUCTION = 'lea'
+										reg[REGLIST[1]] = DESTINATION 
+									elif p_mov.match(DISASM) is not None:
+										INSTRUCTION = 'mov'
+									 	if REGLIST[1] in reg.keys() : del reg[REGLIST[1]] # Stop tracking... out of same DEMENTION
+									
+									print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
+									slice_count += 1
+									found_target = 0
+									for sectionName_2 in resdic.keys():
+										if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
+											if resdic[sectionName_2][DESTINATION][0] == '':
+												simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
+												count += 1
+												resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
+											else:
+												simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
+											found_target = 1
+											break
+									if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+										NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[1]
+										resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+										resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
+										print "       {}... We momorize [{}]...".format(NEWDISASM, resdic[sectionName_1][SORTED_ADDRESS[i]][3])
+		
+					print ""
 
 
 
@@ -287,69 +288,68 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 		'''
 
 		for i in xrange(len(SORTED_ADDRESS)):
-			orig_i = pickpick_idx_of_orig_disasm(resdic[Sname][SORTED_ADDRESS[i]][1])
-			DISASM = resdic[Sname][SORTED_ADDRESS[i]][1][orig_i]
-
-			# TODO: 아마도 백퍼센트 jmp 0x12(%ebx) call 0x12(%eax) 등등 처리안해줘서 문제생길것이다. 나중에 언젠가 regex들을 추가확장하자. 
-			if p_lea.match(DISASM) is not None or p_mov.match(DISASM) is not None:
-
-				if p_lea.match(DISASM) is not None: # 슬데없이 leaw 이따구로 디스어셈블하는 경우, leaw SYMBOLNAME, %eax 할때 truncate 되므로, 그냥 복잡 ㄴㄴ하게 lea로 바꾼다. 
-					INSTRUCTION = 'lea'
-				elif p_mov.match(DISASM) is not None:
-					INSTRUCTION = 'mov'
-
-				ADD_VALUE = extract_hex_addr(DISASM)[0]
-				REGLIST = extract_register(DISASM)
-
-				if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
-					DESTINATION = GOT_baseaddr + ADD_VALUE 
-					for target_section in resdic.keys():
-						if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
-							# 심볼이름 셋팅
-							symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
-							symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
-							# symbolname_next = ???
-							if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
-								symbolname_next = SYMPREFIX[0] + 'MYSYM_PIE_ORIG_'   + str(count) 
-								resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
-							else :
-								symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
-							# symbolname = ???
-							if resdic[target_section][DESTINATION][0] == '': 
-								symbolname = SYMPREFIX[0] + 'MYSYM_PIE_REMAIN_' + str(count)
-								resdic[target_section][DESTINATION][0] = symbolname + ':'
-							else:
-								symbolname = resdic[target_section][DESTINATION][0][:-1]
-							count += 1
-
-
-							NEWDISASM = ' ' + INSTRUCTION + ' ' + symbolname + ', ' + '%' + REGLIST[1]
-							ORIDISASM = resdic[Sname][SORTED_ADDRESS[i]][1]
-							
-							CODEBLOCK_1 = []
-							CODEBLOCK_2 = []
-
-							CODEBLOCK_1.append(' #==========LazySymbolize_GOTbasedpointer==========#')
-							CODEBLOCK_1.append(' pushf' + ' #+++++')
-							CODEBLOCK_1.append(' cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++')
-							CODEBLOCK_1.append(' je ' + symbolname_yes + ' #+++++')
-							CODEBLOCK_1.append(' ' + symbolname_no + ':' + ' #+++++')
-							
-							CODEBLOCK_2.append(' popf' + ' #+++++')
-							CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
-							CODEBLOCK_2.append(' ' + symbolname_yes + ':' + ' #+++++')
-							CODEBLOCK_2.append( NEWDISASM + ' #+++++')
-							CODEBLOCK_2.append(' popf' + ' #+++++')
-							CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
-
-							resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i + 1, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_2)
-							resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_1)
-
-
-							resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
-							print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
-							for lll in resdic[Sname][SORTED_ADDRESS[i]][1]:
-								logging(lll)
+			orig_i_list = pickpick_idx_of_orig_disasm(resdic[Sname][SORTED_ADDRESS[i]][1])
+			for orig_i in orig_i_list:
+				DISASM = resdic[Sname][SORTED_ADDRESS[i]][1][orig_i]
+	
+				# TODO: 아마도 백퍼센트 jmp 0x12(%ebx) call 0x12(%eax) 등등 처리안해줘서 문제생길것이다. 나중에 언젠가 regex들을 추가확장하자. 
+				if p_lea.match(DISASM) is not None or p_mov.match(DISASM) is not None:
+	
+					if p_lea.match(DISASM) is not None: # 슬데없이 leaw 이따구로 디스어셈블하는 경우, leaw SYMBOLNAME, %eax 할때 truncate 되므로, 그냥 복잡 ㄴㄴ하게 lea로 바꾼다. 
+						INSTRUCTION = 'lea'
+					elif p_mov.match(DISASM) is not None:
+						INSTRUCTION = 'mov'
+	
+					ADD_VALUE = extract_hex_addr(DISASM)[0]
+					REGLIST = extract_register(DISASM)
+	
+					if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
+						DESTINATION = GOT_baseaddr + ADD_VALUE 
+						for target_section in resdic.keys():
+							if DESTINATION in resdic[target_section].keys() and target_section in AllSections_WRITE: # resdic 통틀어서 fit in 하는 memory addres가 있다면
+								# 심볼이름 셋팅
+								symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
+								symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
+								# symbolname_next = ???
+								if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
+									symbolname_next = SYMPREFIX[0] + 'MYSYM_PIE_ORIG_'   + str(count) 
+									resdic[Sname][SORTED_ADDRESS[i+1]][0] = symbolname_next + ':'
+								else :
+									symbolname_next = resdic[Sname][SORTED_ADDRESS[i+1]][0][:-1] # ':' 요거 빼주기
+								# symbolname = ???
+								if resdic[target_section][DESTINATION][0] == '': 
+									symbolname = SYMPREFIX[0] + 'MYSYM_PIE_REMAIN_' + str(count)
+									resdic[target_section][DESTINATION][0] = symbolname + ':'
+								else:
+									symbolname = resdic[target_section][DESTINATION][0][:-1]
+								count += 1
+	
+	
+								NEWDISASM = ' ' + INSTRUCTION + ' ' + symbolname + ', ' + '%' + REGLIST[1]
+								ORIDISASM = resdic[Sname][SORTED_ADDRESS[i]][1]
+								
+								CODEBLOCK_1 = []
+								CODEBLOCK_2 = []
+	
+								CODEBLOCK_1.append(' #==========LazySymbolize_GOTbasedpointer==========#')
+								CODEBLOCK_1.append(' pushf' + ' #+++++')
+								CODEBLOCK_1.append(' cmp $HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++')
+								CODEBLOCK_1.append(' je ' + symbolname_yes + ' #+++++')
+								CODEBLOCK_1.append(' ' + symbolname_no + ':' + ' #+++++')
+								
+								CODEBLOCK_2.append(' popf' + ' #+++++')
+								CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
+								CODEBLOCK_2.append(' ' + symbolname_yes + ':' + ' #+++++')
+								CODEBLOCK_2.append(NEWDISASM) # #+++++ 추가하면안댐. 그러면 _progname@GOT(REGISTER_WHO), %eax 처리못하니 주의!
+								CODEBLOCK_2.append(' popf' + ' #+++++')
+								CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
+	
+								resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i + 1, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_2) # 원본바이너리에도 #+++++ 추가안하는것처럼
+								resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_1)
+	
+	
+								resdic[Sname][SORTED_ADDRESS[i]][3] = REGLIST[0]
+								print "[0] {} : {} ---> (DEST:{}), eliminated : {}".format(hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION),resdic[Sname][SORTED_ADDRESS[i]][3])
 
 
 					
@@ -378,23 +378,24 @@ def PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic):
 		SORTED_ADDRESS.sort()
 			
 		for i in xrange(len(SORTED_ADDRESS)):
-			orig_i = pickpick_idx_of_orig_disasm(SectionDic[SORTED_ADDRESS[i]][1])
-			DISASM = SectionDic[SORTED_ADDRESS[i]][1][orig_i]
-			if p_jmp.match(DISASM) is not None:
-				# SETUP
-				ADD_VALUE = extract_hex_addr(DISASM)[0]
-				REGLIST = extract_register(DISASM)
-				INSTRUCTION = DISASM.split(' ')[1]
-				DESTINATION = GOT_baseaddr + ADD_VALUE 
-	
-				NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
-	
-				print SectionDic[SORTED_ADDRESS[i]][1][orig_i]
-				print NEWDISASM
-				print ''
-	
-				SectionDic[SORTED_ADDRESS[i]][1][orig_i] = NEWDISASM
-				SectionDic[SORTED_ADDRESS[i]][3]         = REGLIST[0] # [3] 에다가 소거한 레지스터 저장해야겠따. 
+			orig_i_list = pickpick_idx_of_orig_disasm(SectionDic[SORTED_ADDRESS[i]][1])
+			for orig_i in orig_i_list:
+				DISASM = SectionDic[SORTED_ADDRESS[i]][1][orig_i]
+				if p_jmp.match(DISASM) is not None:
+					# SETUP
+					ADD_VALUE = extract_hex_addr(DISASM)[0]
+					REGLIST = extract_register(DISASM)
+					INSTRUCTION = DISASM.split(' ')[1]
+					DESTINATION = GOT_baseaddr + ADD_VALUE 
+		
+					NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
+		
+					print SectionDic[SORTED_ADDRESS[i]][1][orig_i]
+					print NEWDISASM
+					print ''
+		
+					SectionDic[SORTED_ADDRESS[i]][1][orig_i] = NEWDISASM
+					SectionDic[SORTED_ADDRESS[i]][3]         = REGLIST[0] # [3] 에다가 소거한 레지스터 저장해야겠따. 
 			
 
 # URGENT: 마이그래이션 하는중... 아직 테스트시점이 다가오질 않아서 테스트를 안해봄,,,,,,
@@ -403,12 +404,34 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 	print ""
 	print ""
 	for SectionName in resdic.keys():
-		for addr in resdic[SectionName].keys():
-			if 'REGISTER_WHO' in resdic[SectionName][addr][1]:
-				orig_i = pickpick_idx_of_orig_disasm(resdic[SectionName][addr][1])
-				if orig_i == -1: continue
-				print "------------------------------------REGISTER_WHO------------------------------------"
-				print resdic[SectionName][addr][1][orig_i]
-				resdic[SectionName][addr][1][orig_i] = resdic[SectionName][addr][1][orig_i].replace('REGISTER_WHO', '%' + resdic[SectionName][addr][3])
-				print resdic[SectionName][addr][1][orig_i]
+		for ADDR in resdic[SectionName].keys():
+			orig_i_list = pickpick_idx_of_orig_disasm(resdic[SectionName][ADDR][1])
+			for orig_i in orig_i_list:
+				if 'REGISTER_WHO' in resdic[SectionName][ADDR][1][orig_i]:
+					
+					if orig_i == -1: continue
+					print "------------------------------------REGISTER_WHO------------------------------------"
+					print hex(ADDR)
+					print ''
+	
+					for kkk in resdic[SectionName][ADDR][1]:
+						print kkk
+	
+					# 우선은 리플레이스해주고
+					resdic[SectionName][ADDR][1][orig_i] = resdic[SectionName][ADDR][1][orig_i].replace('REGISTER_WHO', '%' + resdic[SectionName][ADDR][3])
+	
+					# 이제 앞뒤로다가 붙여준다. 
+					CODEBLOCK_1 = []
+					CODEBLOCK_2 = []
+					CODEBLOCK_1.append(' ')
+					CODEBLOCK_1.append(' push %' + resdic[SectionName][ADDR][3] + ' #+++++') # 레지스터 백업
+					CODEBLOCK_1.append(' mov $HEREIS_GLOBAL_OFFSET_TABLE_, %' + resdic[SectionName][ADDR][3] + ' #+++++') # GOT주소 옮김
+					CODEBLOCK_2.append(' pop %' + resdic[SectionName][ADDR][3] + ' #+++++')
+	
+					resdic[SectionName][ADDR][1] = list_insert(orig_i+1, resdic[SectionName][ADDR][1], CODEBLOCK_2)
+					resdic[SectionName][ADDR][1] = list_insert(orig_i, resdic[SectionName][ADDR][1], CODEBLOCK_1)
+					print ''
+					for kkk in resdic[SectionName][ADDR][1]:
+						print kkk
+					
 

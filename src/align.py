@@ -35,35 +35,35 @@ def get_alignmentbyte(addr, type):
 
 def align_text(dics_of_text):
 	SORTED_ADDRESS = sorted(dics_of_text)
-	for i in xrange(len(SORTED_ADDRESS)):
+	for i in xrange(len(SORTED_ADDRESS) - 1):
 		# set disasm_1 and next disasm_1
-		orig_i = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[i]][1]) 
-		disasm_1 = dics_of_text[SORTED_ADDRESS[i]][1][orig_i]
-
-		if i == len(SORTED_ADDRESS)-1	:
-			disasm_2 = "" #마지막 요소라면
-		else: 
-			j = i+1
-			orig_j = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[j]][1])
-			disasm_2 = dics_of_text[SORTED_ADDRESS[j]][1]
+		orig_i_list = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[i]][1]) 
+		if len(orig_i_list) > 0:
+			for orig_i in orig_i_list:
+				disasm_1 = dics_of_text[SORTED_ADDRESS[i]][1][orig_i]
 		
-		if "eiz" in disasm_1:
-			if "eiz" in disasm_2: 
-				dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = "" # eiz 포함라인(현재라인)을 없앰
-				continue
-			else: # 끝까지 갔다. 다음라인에 eiz없음 
-				align = get_alignmentbyte(SORTED_ADDRESS[j],'text')
-				if align == 32:
-					p2align = ".p2align 5,,31"
-				elif align == 16:
-					p2align = ".p2align 4,,15" 
-				elif align == 8:
-					p2align = ".p2align 3,,7"
-				elif align == 4:
-					p2align = ".p2align 2,,3"
-				else: # 다음라인이 align 이 안맞는다면, p2align을 추가해줄 필요가 없음
-					p2align = ""
-				dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = p2align # 주의 : 이전라인의 뒤에 p2align을 추가해 줘야함. 왜냐하면, 현재라인에 추가하면 현재라인에 심볼이 있을경우 그 심볼로 접근했을때 align을 위한 바이트들도 몽땅 들어가서 접근이 되기 때문임.   
+				j = i+1
+				orig_j_list = pickpick_idx_of_orig_disasm(dics_of_text[SORTED_ADDRESS[j]][1])
+				for orig_j in orig_j_list:
+					disasm_2 = dics_of_text[SORTED_ADDRESS[j]][1]
+					
+					if "eiz" in disasm_1:
+						if "eiz" in disasm_2: 
+							dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = '' # eiz 포함라인(현재라인)을 없앰
+							continue
+						else: # 끝까지 갔다. 다음라인에 eiz없음 
+							align = get_alignmentbyte(SORTED_ADDRESS[j],'text')
+							if align == 32:
+								p2align = ".p2align 5,,31"
+							elif align == 16:
+								p2align = ".p2align 4,,15" 
+							elif align == 8:
+								p2align = ".p2align 3,,7"
+							elif align == 4:
+								p2align = ".p2align 2,,3"
+							else: # 다음라인이 align 이 안맞는다면, p2align을 추가해줄 필요가 없음
+								p2align = ""
+						dics_of_text[SORTED_ADDRESS[i]][1][orig_i] = p2align # 주의 : 이전라인의 뒤에 p2align을 추가해 줘야함. 왜냐하면, 현재라인에 추가하면 현재라인에 심볼이 있을경우 그 심볼로 접근했을때 align을 위한 바이트들도 몽땅 들어가서 접근이 되기 때문임.   
 	return dics_of_text		
 	
 def align_data(dics_of_data): # 데이터섹션에서, 만약에 Symbol이 있는데이터라면 align 맞춰주기
@@ -79,6 +79,7 @@ def align_data(dics_of_data): # 데이터섹션에서, 만약에 Symbol이 있�
 
 			if align != 0:
 				j = i-1 # 위의 데이터 (이전데이터) 다음에 .align 을 붙인다.
-				orig_j = pickpick_idx_of_orig_disasm(dics_of_data[SORTED_ADDRESS[j]][1])
-				dics_of_data[SORTED_ADDRESS[j]][1][orig_j] = dics_of_data[SORTED_ADDRESS[j]][1][orig_j] + "\n" + ".align " + str(align)
+				orig_j_list = pickpick_idx_of_orig_disasm(dics_of_data[SORTED_ADDRESS[j]][1])
+				for orig_j in orig_j_list: 
+					dics_of_data[SORTED_ADDRESS[j]][1][orig_j] = dics_of_data[SORTED_ADDRESS[j]][1][orig_j] + "\n" + ".align " + str(align)
 	return dics_of_data

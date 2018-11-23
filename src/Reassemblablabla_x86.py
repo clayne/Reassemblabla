@@ -167,7 +167,7 @@ if __name__=="__main__":
 
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
 	logging("now PIE_LazySymbolize_GOTbasedpointer")
-	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO)
+	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO) ################################
 
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
@@ -182,10 +182,12 @@ if __name__=="__main__":
 	
 
 
+
+
 	# ===마지막으로 call stderror@GOT(REGISTER_WHO)로 blank로 심볼리제이션된거 resdic[3]을 참조해서 레지스터자리채워주기===
 	logging("now fill_blanked_symbolname_toward_GOTSECTION")
 	fill_blanked_symbolname_toward_GOTSECTION(resdic)
-
+                                                                                                                                                                     
 	# === stderr 를 MYSYM_stderr로 바꿔버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도댐)=== COMMENT:1116 data섹션에도 stderr가 박혀있고 .bss섹션에도 stderr가 박혀있는경우 재조립할때 동일한심볼이름 참조했다면서 에러남. 그래서 심볼이름에 섹션이름을 녹여넣도록했음. 
 	logging("now not_global_symbolize_ExternalLinkedSymbol")
 	not_global_symbolize_ExternalLinkedSymbol(resdic)
