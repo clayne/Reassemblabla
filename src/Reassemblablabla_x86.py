@@ -100,7 +100,6 @@ if __name__=="__main__":
 	# pie바이너리를 위한 테이블수정이 살짝 있겠습니다...
 	if CHECKSEC_INFO.pie == True:
 		concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT(REGISTER_WHO)') # TODO: 근데 굳이 GOT relative access 를 안해도 되잖아? -->아냐... GOT based access가 아니면 컴파일러가 불평해 
-		# concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT') 
 		# concat_symbolname_to_TABLE(T_rel['STT_FUNC'], '@PLT') # COMMENT : 이렇게 하면 링킹을 못해오는 경우가 발생. 그래서 그냥 @PLT 빼줬다. 
 		
 
@@ -141,11 +140,13 @@ if __name__=="__main__":
 
 
 	# 심볼라이즈 전에 brackets를 다 제거해야징
-	# URGENT: 이거 안해도 될것같은데? 없어도 될듯..ㅋ 
+	# TODO: 이거 안해도 될것같은데? 없어도 될듯..ㅋ 
+	'''
 	logging("now remove_brackets")
 	for SectionName in CodeSections_WRITE:
 		if SectionName in resdic.keys():
 			remove_brackets(resdic[SectionName]) 
+	'''
 	
 
 	# get_pc_thunk 같은게 있을경우 이거 심볼라이즈
@@ -167,7 +168,7 @@ if __name__=="__main__":
 
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
 	logging("now PIE_LazySymbolize_GOTbasedpointer")
-	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO) ################################
+	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO) 
 
 
 	# ===남은것들 (symbolization 이 안된 것들) 을 일괄적으로 처리한다===
@@ -194,6 +195,8 @@ if __name__=="__main__":
 
 
 
+	logging("now add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array")
+	add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic)
 
 
 

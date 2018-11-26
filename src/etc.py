@@ -115,7 +115,7 @@ def extract_hex_addr(line):
 			
 	return addrlist
 
-# URGENT: 마이그래이션 완료 
+
 def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 	# call __libc_start_main 이 아니라, call 0x8108213 (0x8108213 주소의 심볼 : __libc_start_main) 이더라도 main을 리턴할수 있게만 하면되지.
 	'''
@@ -348,7 +348,6 @@ def gen_compilescript(LOC, filename):
 	os.system(cmd)
 
 
-# URGENT: 마이그래이션 함. 하지만 테스트는 아직 시점이안와서 안해봄
 def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
 
@@ -361,41 +360,49 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
 
-
-	if CHECKSEC_INFO.relro == 'Full':
+	# 이거 이제 좆도필요없음. 왜냐면 main의 시작부분에 다이나믹하게 _GLOBAL_OFFSET_TABLE_ 의 값을 구해올수 있기 때문임. 
+	'''
+	if CHECKSEC_INFO.relro == 'Full': # _GLOBAL_OFFSET_TABLE 이 .got 의 시작이다. .got 는 .dynamic 뒤에 따라온다. 
+		f.write(".section .dynamic\n") # URGENT: 아직 테스트중임
+		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
+	else: # _GLOBAL_OFFSET_TABLE_ 이 .got.plt의 시작이다. <.got> 뒤에 <.got.plt> 가 오므로 .got에 추가해주는게 맞다. 
 		f.write(".section .got\n")
 		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
-	else:
-		f.write(".section .got.plt\n")
-		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
+	
+	f.write(".section .got\n")
+	f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
+	'''
+	# URGENT: 아래두라인 삭제하고 add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array 함수 활성화
+	f.write(".section .got\n")
+	f.write("MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
-			SectionThatLoaderAutomaticallyAdds_code = ['.init','.fini', '.ctors', '.dtors', '.plt.got']
-			SectionThatLoaderAutomaticallyAdds_data = ['.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
-			if sectionName in SectionThatLoaderAutomaticallyAdds_code:
-				f.write("\n" + ".section " + ".text" + "\n")
-				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
-			elif sectionName in SectionThatLoaderAutomaticallyAdds_data:
-				f.write("\n" + ".section " + ".data" + "\n")
-				f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
-			else:
-				f.write("\n"+".section "+sectionName+"\n")
+			if sectionName not in DoNotWriteThisSection:
+				if sectionName in TreatThisSection2TEXT:
+					f.write("\n" + ".section " + ".text" + "\n")
+					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
+				elif sectionName in TreatThisSection2DATA:
+					f.write("\n" + ".section " + ".data" + "\n")
+					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
+				else:
+					f.write("\n"+".section "+sectionName+"\n")
+	
+				if sectionName == '.init_array' or sectionName == '.fini_array':
+					'--> 원래 .init_array, .fini_array는 align되면 안된다. 왜냐하면 저장된 주소레퍼런스값을 순회할때 +4+4... 으로 포인터값을 늘려나가는데, 00000000 패딩이 추가된다면 그곳을 실행하게되기 때문이다. '
+				else:
+					f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 
-			if sectionName == '.init_array' or sectionName == '.fini_array':
-				'--> 원래 .init_array, .fini_array는 align되면 안된다. 왜냐하면 저장된 주소레퍼런스값을 순회할때 +4+4... 으로 포인터값을 늘려나가는데, 00000000 패딩이 추가된다면 그곳을 실행하게되기 때문이다. '
-			else:
-				f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
-			if comment == 1: 
-				RANGES = 3 # 3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 그리고 이거추가하면 어셈블도 안됨.
-			else:
-				RANGES = 2
-			for ADDR in sorted(resdic[sectionName].iterkeys()): #정렬
-				for i in xrange(RANGES): 
-					if len(resdic[sectionName][ADDR][i]) > 0: # 그냥 엔터만 아니면 됨 
-						if i == 1:
-							for j in xrange(len(resdic[sectionName][ADDR][i])):
-								f.write(resdic[sectionName][ADDR][i][j]+"\n")	
-						else:
-							f.write(resdic[sectionName][ADDR][i]+"\n")
+				if comment == 1: 
+					RANGES = 3 # 3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 그리고 이거추가하면 어셈블도 안됨.
+				else:
+					RANGES = 2
+				for ADDR in sorted(resdic[sectionName].iterkeys()): #정렬
+					for i in xrange(RANGES): 
+						if len(resdic[sectionName][ADDR][i]) > 0: # 그냥 엔터만 아니면 됨 
+							if i == 1:
+								for j in xrange(len(resdic[sectionName][ADDR][i])):
+									f.write(resdic[sectionName][ADDR][i][j]+"\n")	
+							else:
+								f.write(resdic[sectionName][ADDR][i]+"\n")
 	f.close()

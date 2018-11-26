@@ -36,6 +36,7 @@ def run(filename):
 	# cmd += " -l folder --align --comment --shrinksize" # shrink the size by thinning local symbols.
 	cmd += " -l folder --align --comment >  z" # shrink the size by thinning local symbols.
 	
+	
 	try:
 		os.system(cmd)
 		idx[0] += 1
