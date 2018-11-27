@@ -135,7 +135,7 @@ def VSA_is_memoryAddr_ornot(resdic, SectionName, ADDR, orig_i, theHexValue):
 	'''
 	addl $0x805a953, %eax
 	#=> ADDR:0x80494df BYTE:0553a90508
-	이런게 있기때문ㅇ...
+	이런게 있기때문ㅇ
 	'''
 	return True
 

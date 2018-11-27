@@ -39,7 +39,7 @@ def run(filename):
 	
 	try:
 		os.system(cmd)
-		idx[0] += 1
+		idx[0] += 1                          
 		print "[{}]. {}".format(idx[0], filename)
 	except:
 		print "  error"
