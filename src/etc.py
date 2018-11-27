@@ -363,7 +363,7 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	# 이거 이제 좆도필요없음. 왜냐면 main의 시작부분에 다이나믹하게 _GLOBAL_OFFSET_TABLE_ 의 값을 구해올수 있기 때문임. 
 	'''
 	if CHECKSEC_INFO.relro == 'Full': # _GLOBAL_OFFSET_TABLE 이 .got 의 시작이다. .got 는 .dynamic 뒤에 따라온다. 
-		f.write(".section .dynamic\n") # URGENT: 아직 테스트중임
+		f.write(".section .dynamic\n")
 		f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 	else: # _GLOBAL_OFFSET_TABLE_ 이 .got.plt의 시작이다. <.got> 뒤에 <.got.plt> 가 오므로 .got에 추가해주는게 맞다. 
 		f.write(".section .got\n")
@@ -372,10 +372,6 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	f.write(".section .got\n")
 	f.write("HEREIS_GLOBAL_OFFSET_TABLE_:\n")
 	'''
-	# URGENT: 아래두라인 삭제하고 add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array 함수 활성화
-	f.write(".section .got\n")
-	f.write("MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_:\n")
-
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
 			if sectionName not in DoNotWriteThisSection:

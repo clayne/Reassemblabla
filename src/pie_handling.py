@@ -132,15 +132,16 @@ def PIE_calculated_addr_symbolize(resdic):
 
 										if found_target == 1 and sectionName_2 in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다. 
 											INSTRUCTION = 'lea'
-											# URGENT: 아래두줄 활성화,,, 하시발 libstdbuf.so 자꾸에러떠서 우선 비활성화하고 add $_GLOBAL_OFFSET_TABLE_로 바꿔줬었음
-											'''
+											# COMMENT: a. 아래두줄 활성화해야함.  하시발 libstdbuf.so 자꾸에러떠서 우선 비활성화하고 add $_GLOBAL_OFFSET_TABLE_로 바꿔줬었음
+											
 											NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[0]
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
-											'''
+											
 
-									# URGENT: 아래두줄 지워버려라. 아예.
+									# COMMENT: b. 아래두줄 지워버려라. 아예.
 									# 'addl $0x19c7, %ebx 에서 "%ebx" 가 keep tracking 하는 레지스터라면,' 를 따질필요가 없다. 
+									'''
 									orig_tmp_list = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i-1]][1])
 									for orig_tmp in orig_tmp_list:
 										DISASM_tmp = resdic[sectionName_1][SORTED_ADDRESS[i-1]][1][orig_tmp]
@@ -148,6 +149,7 @@ def PIE_calculated_addr_symbolize(resdic):
 											NEWDISASM = ' ' + 'add' + ' ' + '$_GLOBAL_OFFSET_TABLE_' + ', ' + '%' + REGLIST[0]
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											print "       {}".format(NEWDISASM)
+									'''
 											
 
 
@@ -335,7 +337,7 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 					if REGLIST[0] in pcthunk_reglist: # pcthunk 에서 리턴하는 레지스터라면, 
 						DESTINATION = GOT_baseaddr + ADD_VALUE 
 						for target_section in resdic.keys():
-							if DESTINATION in resdic[target_section].keys() and target_section not in DoNotWriteThisSection: # URGENT: DoNotWriteThisSection 손봐야하는거 알즤..??ㅎㅎ///
+							if DESTINATION in resdic[target_section].keys() and target_section not in DoNotWriteThisSection: 
 								# 심볼이름 셋팅
 								symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
 								symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
@@ -362,8 +364,7 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 	
 								CODEBLOCK_1.append(' #==========LazySymbolize_GOTbasedpointer==========#')
 								CODEBLOCK_1.append(' pushf' + ' #+++++')
-								# CODEBLOCK_1.append(' cmp MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++')
-								CODEBLOCK_1.append(' cmp $MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++') # URGENT: 이거 add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array 우선한번 비활성화해보기위해서 이렇게 바꿔준거임. 다시 위에라인 활성화하셈
+								CODEBLOCK_1.append(' cmp MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++')
 								CODEBLOCK_1.append(' je ' + symbolname_yes + ' #+++++')
 								CODEBLOCK_1.append( symbolname_no + ':' + ' #+++++')
 								
@@ -453,8 +454,7 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 					CODEBLOCK_2 = []
 					CODEBLOCK_1.append(' ')
 					CODEBLOCK_1.append(' push %' + resdic[SectionName][ADDR][3] + ' #+++++') # 레지스터 백업
-					# CODEBLOCK_1.append(' mov MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + resdic[SectionName][ADDR][3] + ' #+++++') # GOT주소 옮김
-					CODEBLOCK_1.append(' mov $MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + resdic[SectionName][ADDR][3] + ' #+++++') # URGENT: 이것도 위에라인 활성화
+					CODEBLOCK_1.append(' mov MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + resdic[SectionName][ADDR][3] + ' #+++++') 
 					CODEBLOCK_2.append(' pop %' + resdic[SectionName][ADDR][3] + ' #+++++')
 	
 					resdic[SectionName][ADDR][1] = list_insert(orig_i+1, resdic[SectionName][ADDR][1], CODEBLOCK_2)
@@ -465,7 +465,7 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 					
 
 def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
-	'''
+
 	CODEBLOCK_TEXT  = []
 	CODEBLOCK_INITARRAY = []
 
@@ -489,7 +489,7 @@ def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
 
 
 
-	# [01] CODEBLOCK_TEXT 은 텍스트섹션의 very end 에다가 깔쌈하게 붙여주자. 
+	# [01] CODEBLOCK_TEXT 은 텍스트섹션의 very end 에다가 깔쌈하게 붙여주자. LAST 여야함. 그래야 특정심볼의안에서 중복실행을 방지할수가있음 
 	SORTED_ADDRESS = resdic['.text'].keys()
 	SORTED_ADDRESS.sort()
 	ADDR_LAST = SORTED_ADDRESS[-1] # 마지막주소
@@ -503,16 +503,14 @@ def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
 	if '.init_array' in resdic.keys(): # 섹션이 원래있다면
 		SORTED_ADDRESS = resdic['.init_array'].keys()
 		SORTED_ADDRESS.sort()
-		ADDR_LAST = SORTED_ADDRESS[-1] # 마지막주소
+		ADDR_FIRST = SORTED_ADDRESS[0] # 처음주소
 	else: # 섹션이 원래없다면 섹션itself를 추가해줘야 함
 		resdic['.init_array'] = {}
-		ADDR_LAST = 0x00000000
+		ADDR_FIRST = 0x00000001
 
-	resdic['.init_array'][ADDR_LAST + 1] = ['',
+	resdic['.init_array'][ADDR_FIRST-1] = ['',
 											CODEBLOCK_INITARRAY,
 											'',
 											'']
-	'''
-	# URGENT: 위에라인 그대로 활성화
-	'DISABLED...'
+
 

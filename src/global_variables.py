@@ -12,11 +12,6 @@ DataSections_IN_resdic = DataSections_WRITE
 
 AllSection_IN_resdic = CodeSections_IN_resdic + DataSections_IN_resdic
 
-# URGENT: 아래 코드는 plt,got 잘 따져가면서 다시설계해라. 왜냐하면 libstdbuf.so 예젅디스어셈블버전하고 맞추려고 이렇게 설정했을뿐이니까.
-'''
-TreatThisSection2TEXT = ['.plt.got','.plt','.init','.fini', '.ctors', '.dtors']
-TreatThisSection2DATA = ['.got', '.got.plt', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata']
-'''
 TreatThisSection2TEXT = ['.init','.fini', '.ctors', '.dtors', '.plt.got', '.plt']
 TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got', '.got.plt']
 
