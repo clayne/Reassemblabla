@@ -35,7 +35,6 @@ def PIE_set_getpcthunk_loc(resdic):
 
 
 
-# COMMENT: 마이그레이션 완료. TODO: 코드 새니타이징.,,
 # SectionDic[SORTED_ADDRESS[i]][3] = 만약 get_pc_thunk 호출부라면 EIP
 #                                    아니라면 substitute 되기때문에 소거되는 RegName 을 memorial 로다가 써줌
 def PIE_calculated_addr_symbolize(resdic):
@@ -56,47 +55,61 @@ def PIE_calculated_addr_symbolize(resdic):
 			i += 1 
 			orig_i_list = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1])
 			for orig_i in orig_i_list:
-
 				DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_i]
 				if '__x86.get_pc_thunk' in DISASM:
+					# <<<<<에뮬레이션에 필요한 여러가지 값들을 셋팅한다.>>>>> 
 					slice_count = 0
-	
 					reg = {} # 자, 레지스터 에뮬레이션 준비~~ 
-	
 					REG_STHX = DISASM[DISASM.index('get_pc_thunk.') + len('get_pc_thunk.'):]
 					REG_STHX = REG_STHX[REG_STHX.index('.')+1:]
 					REG_STHX = 'e' + REG_STHX
 					BASE = int(resdic[sectionName_1][SORTED_ADDRESS[i]][3]) # == EIP
-					
 					reg[REG_STHX] = BASE
 					print "==========================================================="
 					print "[{}] {} : {} ---{}---> {}              [[[START]]]".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM,REG_STHX,hex(reg[REG_STHX]))
 					slice_count += 1
 	
-					stepSlice = 0
+					stepSlice = 'keep going'
 					while 1: # 코드 슬라이싱 시작	 
-						if stepSlice is 1: 
+						if stepSlice is 'stop slicing': 
 							break
+						elif stepSlice is 'new start of slicing':
+							# <<<<<에뮬레이션에 필요한 여러가지 값들을 셋팅한다.>>>>> 
+							slice_count = 0
+							reg = {} # 자, 레지스터 에뮬레이션 준비~~ 
+							REG_STHX = DISASM[DISASM.index('get_pc_thunk.') + len('get_pc_thunk.'):]
+							REG_STHX = REG_STHX[REG_STHX.index('.')+1:]
+							REG_STHX = 'e' + REG_STHX
+							BASE = int(resdic[sectionName_1][SORTED_ADDRESS[i]][3]) # == EIP
+							reg[REG_STHX] = BASE
+							print "==========================================================="
+							print "[{}] {} : {} ---{}---> {}              [[[START]]]".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM,REG_STHX,hex(reg[REG_STHX]))
+							slice_count += 1
+							stepSlice = 'keep going' # 셋팅 다해주고는 플래그를 다시 바꿔줘야지.
 
-						i += 1
-						if i >= len(SORTED_ADDRESS): break # DISASM 을 설정하기위한 최소한의조건 충족안되면 break
+						i += 1 # 다음인스트럭션 나와라. 
+						if i >= len(SORTED_ADDRESS): 
+							break # DISASM 을 설정하기위한 최소한의조건 충족안되면 break
+
 						orig_j_list = pickpick_idx_of_orig_disasm(resdic[sectionName_1][SORTED_ADDRESS[i]][1])
 
 
-						for orig_j in orig_j_list:
+						for orig_j in orig_j_list: # TODO: 뭔가이거 나중에 문제될것같다? orig_j에 대해서 모두 해주는데, 레지스터값을 전역변수로다가 재활용하고 있자나..ㅋㅋ
 	
 							DISASM = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j]
 		
 							# 코드슬라이싱을 끝내는 조건 
 							if 'ret' in DISASM: 
-								stepSlice = 1
+								stepSlice = 'stop slicing'
 								break   # 베이직블락 끝나면 break
 							if 'get_pc_thunk' in DISASM: 
-								stepSlice = 1
-								break # 또다른 블락의 시작이되면 break 
+								stepSlice = 'new start of slicing'
+								break 
 							
 							# The Ultimate REGEX!
 							_ = '.*?'
+							b_REGREF = '(0x)?' + '[0-9a-f]+' +  _ + '%' + _ 
+
 							p_add   = re.compile(' add' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # add $0x1b53, %ebx
 							p_sar   = re.compile(' sar' + _ + '[-+]?' + _ + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                     # sar $0x2, %ebx
 							p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # leal.d32 -3(%ebx), %eax
@@ -104,8 +117,12 @@ def PIE_calculated_addr_symbolize(resdic):
 							p_call  = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
 							p_xor   = re.compile(' xor' + _ + '%' + _ + '%' + _)                                                      # xorl %edi, %edi
 							p_push  = re.compile(' push' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ )                  # pushl.d32 -0xc(%ebx) 
-		
-		
+
+							# URGENT: 룰 추가, cmp 도 추가. ex) cmpb $0x2d, 0(%esi) # emulating... eax:0x161d4 / edi:0x161d4 / ebx:0x15e28 / esi:0x161d8 / ecx:0x0 / 
+							# cmpb $0x2d, 0(%esi) 와 cmpb $0x2d, MYSTR 은 동치임  
+							# 주의 : cmpb $0x2d, 0(%esi) 는 메모리레퍼런스 이지만 cmpb $0x2d, %esi 는 단순한 esi값 비교임. 주의할것! 
+
+
 							# EMU_01 : [addl $0x19c7, %ebx]
 							if p_add.match(DISASM) is not None: 
 								if len(extract_hex_addr(DISASM)) > 0:
@@ -130,14 +147,20 @@ def PIE_calculated_addr_symbolize(resdic):
 												else:  # symbol exists already at there. 
 													simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
 
-										if found_target == 1 and sectionName_2 in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+										if found_target == 1 and sectionName_2 in AllSections_WRITE: # lea PIE_MYSYM_01, %eax 으로 바꾼다.
+											# URGENT: 이거 원래 CASE1이었는데 2로 바꿔가지고 테스트중임. 나중에 확인고고
+											'''
+											##### CASE1 : base register 에 ORIGINAL GOT 를 셋팅.  
 											INSTRUCTION = 'lea'
-											# COMMENT: a. 아래두줄 활성화해야함.  하시발 libstdbuf.so 자꾸에러떠서 우선 비활성화하고 add $_GLOBAL_OFFSET_TABLE_로 바꿔줬었음
-											
 											NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname + ', ' + '%' + REGLIST[0]
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+											'''
+
+											##### CASE2 : base register 에 NEW GOT 를 셋팅. 이거하는 이유는 lazy_symbolize 에서 심볼화여부를 base_register == new GOT 로 결정하기때문. lazy_symbolize 로직을바꾸거나 이걸바꾸거나 둘중하난데 우선은 이걸바꿔봄. 
+											INSTRUCTION = 'add'
+											NEWDISASM = ' ' + INSTRUCTION + ' ' + '$_GLOBAL_OFFSET_TABLE_' + ', ' + '%' + REGLIST[0]
+											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
-											
 
 									# COMMENT: b. 아래두줄 지워버려라. 아예.
 									# 'addl $0x19c7, %ebx 에서 "%ebx" 가 keep tracking 하는 레지스터라면,' 를 따질필요가 없다. 
@@ -150,10 +173,7 @@ def PIE_calculated_addr_symbolize(resdic):
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											print "       {}".format(NEWDISASM)
 									'''
-											
-
-
-											
+													
 		
 							# EMU_02 : [calll.d32 *-0xf8(%ebx, %edi, 4)]
 							elif p_call.match(DISASM) is not None:
@@ -184,6 +204,7 @@ def PIE_calculated_addr_symbolize(resdic):
 										print "       {}".format(NEWDISASM)
 										# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군
 		
+
 							# EMU_03 : [pushl.d32 -0xc(%ebx)] 
 							elif p_push.match(DISASM) is not None:
 								ADD_VALUE       = extract_hex_addr(DISASM)
@@ -215,9 +236,7 @@ def PIE_calculated_addr_symbolize(resdic):
 										print "       {}".format(NEWDISASM)
 										# resdic[sectionName_1][SORTED_ADDRESS[i]][3] = 아, 소거되는 레지스터가 없군 COMMENT: GOT based 로다가 접근하는경우에 %ebx라는값이 중요한 역할을 함. 그래서 [3]에다가 저장하였따
 										resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
-		
-		
-		
+	
 							elif p_sar.match(DISASM) is not None:
 								REGLIST   = extract_register(DISASM)
 								if REGLIST[0] in reg.keys(): del reg[REGLIST[0]] # reg deverts The Demension. Delete it. 
@@ -228,7 +247,7 @@ def PIE_calculated_addr_symbolize(resdic):
 									reg[REGLIST[0]] = 0
 		
 		
-							# EMU_02 : [lea -0xf4(%ebx),%esi] / [mov -0xf4(%ebx),%esi] 
+							# EMU_04 : [lea -0xf4(%ebx),%esi] / [mov -0xf4(%ebx),%esi] 
 							elif p_lea.match(DISASM) is not None or p_mov.match(DISASM) is not None:
 								ADD_VALUE       = extract_hex_addr(DISASM)
 								REGLIST         = extract_register(DISASM)
@@ -268,10 +287,13 @@ def PIE_calculated_addr_symbolize(resdic):
 										resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST[0]
 										print "       {}... We momorize [{}]...".format(NEWDISASM, resdic[sectionName_1][SORTED_ADDRESS[i]][3])
 
+
 						_rstr = ''
-						for _r in reg.keys():
-							_rstr += '{}:{} / '.format(str(_r), str(hex(reg[_r])))
-						resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] + ' # emulating... {}'.format(_rstr)
+
+						if stepSlice is 'keep going': # 슬라이싱 중이라면 디스어셈블리에도 프린트해줘야게따
+							for _r in reg.keys():
+								_rstr += '{}:{} / '.format(str(_r), str(hex(reg[_r])))
+							resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] +=' # emulating... {}'.format(_rstr)
 		
 					print ""
 
@@ -339,8 +361,11 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 						for target_section in resdic.keys():
 							if DESTINATION in resdic[target_section].keys() and target_section not in DoNotWriteThisSection: 
 								# 심볼이름 셋팅
-								symbolname_yes  = SYMPREFIX[0] + 'MYSYM_PIE_YES_'    + str(count)
-								symbolname_no   = SYMPREFIX[0] + 'MYSYM_PIE_NO_'     + str(count)
+								symbolname_startoflazy = SYMPREFIX[0] + 'MYSYM_PIE_STARTOFLAZY_' + str(count)
+								symbolname_yes         = SYMPREFIX[0] + 'MYSYM_PIE_YES_'         + str(count)
+								symbolname_no          = SYMPREFIX[0] + 'MYSYM_PIE_NO_'          + str(count)
+
+
 								# symbolname_next = ???
 								if resdic[Sname][SORTED_ADDRESS[i+1]][0] == '':
 									symbolname_next = SYMPREFIX[0] + 'MYSYM_PIE_ORIG_'   + str(count) 
@@ -361,20 +386,26 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 								
 								CODEBLOCK_1 = []
 								CODEBLOCK_2 = []
-	
-								CODEBLOCK_1.append(' #==========LazySymbolize_GOTbasedpointer==========#')
+
+								CODEBLOCK_1.append(' ')
+								CODEBLOCK_1.append(' #==========LazySymbolize_GOTbasedpointer==========#') 
+
+								if resdic[Sname][SORTED_ADDRESS[i]][0] == '': # 이 인스트럭션의 [0]에 이미 심볼이 붙어있다면 심볼화 (X)
+									CODEBLOCK_1.append( symbolname_startoflazy + ':' + ' #+++++')
+
 								CODEBLOCK_1.append(' pushf' + ' #+++++')
 								CODEBLOCK_1.append(' cmp MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %' + REGLIST[0] + ' #+++++')
 								CODEBLOCK_1.append(' je ' + symbolname_yes + ' #+++++')
 								CODEBLOCK_1.append( symbolname_no + ':' + ' #+++++')
-								
+								# ORIDISASM 자리. (아래에서 CODEBLOCK_1 + ORIDISASM + CODEBLOCK_2 함)
 								CODEBLOCK_2.append(' popf' + ' #+++++')
 								CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
 								CODEBLOCK_2.append( symbolname_yes + ':' + ' #+++++')
 								CODEBLOCK_2.append(NEWDISASM) # #+++++ 추가하면안댐. 그러면 _progname@GOT(REGISTER_WHO), %eax 처리못하니 주의!
 								CODEBLOCK_2.append(' popf' + ' #+++++')
 								CODEBLOCK_2.append(' jmp ' + symbolname_next + ' #+++++')
-	
+								CODEBLOCK_2.append(' ')
+
 								resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i + 1, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_2) # 원본바이너리에도 #+++++ 추가안하는것처럼
 								resdic[Sname][SORTED_ADDRESS[i]][1] = list_insert(orig_i, resdic[Sname][SORTED_ADDRESS[i]][1], CODEBLOCK_1)
 	
@@ -471,7 +502,6 @@ def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
 
 	CODEBLOCK_TEXT.append('MYSYM_SET_GLOBAL_OFFSET_TABLE: #+++++')
 	CODEBLOCK_TEXT.append(' .comm MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, 4 #+++++')
-	
 	CODEBLOCK_TEXT.append(' push %ebx #+++++') 										# [1] 먼저 %ebx 를 백업해두자. GOT주소를 여기에 저장할테니. 
 	CODEBLOCK_TEXT.append(' call MYSYM_get_pc_thunk.bx #+++++') 					# [2] _GLOBAL_OFFSET_TABLE 구해오자
 	CODEBLOCK_TEXT.append(' add $_GLOBAL_OFFSET_TABLE_, %ebx #+++++')
