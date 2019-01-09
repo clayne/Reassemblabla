@@ -76,22 +76,20 @@ def not_global_symbolize_ExternalLinkedSymbol(resdic):
 				if resdic[SectionName][addr][0].startswith(SYMPREFIX[0] + 'MYSYM_') == True:
 					"This is my symbol. :) PASS."
 				else:
-					symbolname = resdic[SectionName][addr][0]
+					symbolname = resdic[SectionName][addr][0][:-1]
 					if '@' in symbolname:
-						spoiled = symbolname
-						spoiled = spoiled[:spoiled.index('@')] + ':' # stderr@GOT(%ebx) 이런식으로 지어진 이름의 심볼. 
-						spoiled = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + spoiled
-						resdic[SectionName][addr][0] = spoiled
+						symbolname = symbolname[:symbolname.index('@')] # stderr@GOT(%ebx) 의 @뒤에 떼기
+						symbolname = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + symbolname 
+						resdic[SectionName][addr][0] = symbolname + ':'
 					elif 'MYSYM' not in symbolname:
 						flag_namedsymbol = 0
-						for pasSSs in MyNamedSymbol:
-							if pasSSs in symbolname:
+						for permitted_name in MyNamedSymbol:
+							if symbolname.startswith(permitted_name): # __x86.get_pc_thunk.si, __x86.get_pc_thunk.di, ...
 								flag_namedsymbol = 1
-								'Good. You Servived.'
+								'Good. You Servived.' 
 						if flag_namedsymbol is 0: # You are not permitted symbol name. ex)printf
-							spoiled = symbolname
-							spoiled = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + spoiled
-							resdic[SectionName][addr][0] = spoiled
+							symbolname = SYMPREFIX[0] + 'MYSYM_SPOILED_' + SectionName[1:] + '_' + symbolname
+							resdic[SectionName][addr][0] = symbolname + ':'
 	return resdic		
 
 def getpcthunk_labeling(resdic):
@@ -133,35 +131,29 @@ def getpcthunk_labeling(resdic):
 # 우선은 헥스값을 발라내고, 만약 딕셔너리에 그 헥스값이 있다면 심볼화
 # input : resdic
 def symbolize_textsection(resdic):
-	_from = CodeSections_WRITE
-	_to = AllSection_IN_resdic
-	
+	# START!
 	symbolcount = 0	
-	for section_from in _from:
-		for section_to in _to:
+	for section_from in CodeSections_WRITE:
+		for section_to in AllSections_WRITE:
 			if section_from in resdic.keys() and section_to in resdic.keys():
+				print '     {} -----> {}'.format(section_from, section_to)
 				for ADDR in resdic[section_from].keys(): 
 					orig_i_list = pickpick_idx_of_orig_disasm(resdic[section_from][ADDR][1])
 					for orig_i in orig_i_list:
-						addrlist = extract_hex_addr(resdic[section_from][ADDR][1][orig_i])
-						for ADDR_TO_SYM in addrlist: 
-							if VSA_is_memoryAddr_ornot(resdic, section_from, ADDR, orig_i, ADDR_TO_SYM) is True: # 심볼라이즈를 하고싶은 주소 ADDR_TO_SYM 가 우리의 VSA결과 메모리주소라고 판단되었다면
-								for section_to in _to: # _from --> _to 
-									if section_to not in resdic.keys(): # COMMENT: excepation handling 추가 @0903 
-										continue
-									if ADDR_TO_SYM in resdic[section_to].keys(): 
-										# symbol name setting
-										if resdic[section_to][ADDR_TO_SYM][0] != "": # if symbol already exist
-											simbolname = resdic[section_to][ADDR_TO_SYM][0][:-1] # MYSYM1: --> MYSYM1
-										else: # else, create my symbol name 
-											simbolname = SYMPREFIX[0] + "MYSYM_"+str(symbolcount)
-											symbolcount = symbolcount + 1
-											resdic[section_to][ADDR_TO_SYM][0] = simbolname + ":"
-										
-										resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(ADDR_TO_SYM),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-										resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(ADDR_TO_SYM)[2:],simbolname) # 그게아니라 8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-										p = re.compile('\<.*?\>') # 'call MYSYM_14 <fast_memcpy>' -> 'call MYSYM_14'. 심볼라이즈후에는 뒤에오는거제거해도된다. 심볼라이즈를안했을시에는 제거하면안된다. 나중에그걸기반으로 lfunc_remove_callweirdfunc 때릴꺼기때매
-										resdic[section_from][ADDR][1][orig_i] =  re.sub(p, "", resdic[section_from][ADDR][1][orig_i])
+						destinations = extract_hex_addr(resdic[section_from][ADDR][1][orig_i])
+						for DESTINATION in destinations: 
+							if VSA_is_memoryAddr_ornot(resdic[section_from][ADDR][1][orig_i]) is True: # 심볼라이즈를 하고싶은 주소 DESTINATION 가 우리의 VSA결과 메모리주소라고 판단되었다면
+								if DESTINATION in resdic[section_to].keys(): 
+									# 심볼이름셋팅
+									if resdic[section_to][DESTINATION][0] != "": # if symbol already exist
+										simbolname = resdic[section_to][DESTINATION][0][:-1] # MYSYM1: --> MYSYM1
+									else: # else, create my symbol name 
+										simbolname = SYMPREFIX[0] + "MYSYM_" + str(symbolcount)
+										symbolcount = symbolcount + 1
+										resdic[section_to][DESTINATION][0] = simbolname + ":"
+									
+									resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DESTINATION),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+									resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DESTINATION)[2:],simbolname) # 그게아니라 12 이렇게생겼을경우 12 --> MYSYM_1 치환 (그럴리는없겠지만?말이지.)
 
 	return resdic
 
@@ -172,7 +164,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 	# 2. 있으면 그 .byte 01 .byte 04 .byte 20 .byte 80  자리에 .byte 심볼이름 을 씀. 
 	#    4byte align 맞춰가면서 symbolize 하기
 	_from = DataSections_WRITE     
-	_to = AllSection_IN_resdic
+	_to   = AllSections_WRITE
 	symcnt = 0
 	for section_from in _from:
 		if _from == '.bss':# bss에는 아무것도 안들어있자나..
@@ -202,7 +194,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 										resdic[section_from].pop(sorted_keylist[i+2])
 										resdic[section_from].pop(sorted_keylist[i+1])
 										resdic[section_from][    sorted_keylist[i+0]][1][0] = " .long " + symbolname[:-1] # ':' 떼기위해-1, not delete, just modify data format(.byte->.long)
-										resdic[section_from][    sorted_keylist[i+0]][2] = '#=> ' + 'ADDR:' + str(hex(sorted_keylist[i+0])) + ' BYTE:' + candidate[2:] 
+										resdic[section_from][    sorted_keylist[i+0]][2] = '                              #=> ' + 'ADDR:' + str(hex(sorted_keylist[i+0])) + ' BYTE:' + candidate[2:] 
 										resdic[section_to][int(candidate,16)][0]= symbolname # symbolize that loc
 										i = i + 4 # because entry of dict poped
 										symcnt = symcnt + 1
@@ -219,7 +211,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 
 
 
-# je 2a0c 처럼 이상한곳으로 점프하는 (심볼리제이션이 안된 곳) 인스트럭션이 있다면 je XXX 로 바꾼다. 어셈블을 잘되게 하기 위함이지.. 
+# je 2a0c 처럼 이상한곳으로 점프하는 (심볼리제이션이 안된 곳) 인스트럭션이 있다면 je XXX 로 바꾼다. 어셈블을 잘되게 하기 위함이지.. TODO: Crash based 이프이프핸들러기능이 도입되면 이거 없애야함.
 def lfunc_change_callweirdaddress_2_callXXX(dics_of_text):
 	branch_inst = ['jmp','je','jne','jg','jge','ja','jae','jl','jle','jb','jbe','jo','jno','jz','jnz','js','jns','call'] # ,'loop','loope','loopne' 는 loop XXX 라고해봤자 에러메시지 뿜어댐. 왠지 모르겠다. 그러니까 이거 세개는 제외시키자. lfunc_change_loop_call_jmp_and_hexvalue_instruction_to_data가 알아서 처리해줄거임
 	
@@ -252,7 +244,7 @@ def lfunc_change_callweirdaddress_2_callXXX(dics_of_text):
 
 
 # lfunc_remove_callweirdaddress 보다 더 진보된 방법이다..
-# je 2a0c 처럼 이상한곳으로 점프하는 (심볼리제이션이 안된 곳) 인스트럭션이 있다면, 데이터로 때려박는다. ㅋㅋ 어셈블이 잘되게 하기 때문이지... 
+# je 2a0c 처럼 이상한곳으로 점프하는 (심볼리제이션이 안된 곳) 인스트럭션이 있다면, 데이터로 때려박는다. ㅋㅋ 어셈블이 잘되게 하기 때문이지... TODO: Crash based 이프이프핸들러기능이 도입되면 이거 없애야함.
 def lfunc_change_callweirdaddress_2_data(dics_of_text):  
 	branch_inst = ['jmp','je','jne','jg','jge','ja','jae','jl','jle','jb','jbe','jo','jno','jz','jnz','js','jns','call','loop','loope','loopne']
 	

@@ -14,14 +14,11 @@ from binary2dic import *
 from global_variables import *
 
 def lfunc_remove_pseudoinstruction(dics_of_text):
-	'''
-	eiz 를 포함하는 모든 인스트럭션은 그냥 nop 으로 바꾼다
-	'''
+	# eiz 를 포함하는 모든 인스트럭션은 그냥 nop 으로 바꾼다
 	for i in range(0,len(dics_of_text)):
 		key = dics_of_text.keys()[i]
 		if "eiz" in dics_of_text.values()[i][1][0]: 
 			dics_of_text[key][1][0] = " nop"
-			#dics_of_text.update({key:[dics_of_text.values()[i][0]," nop"]})
 
 # handle no needed jumps (8048419:"jne 8048420 <frame_dummy+0x10>") --> (8048419:"jne XXX") 
 def lfunc_remove_callweirdfunc(dics_of_text):
@@ -90,7 +87,7 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got'])[0]
 		else:
 			_GLOBAL_OFFSET_TABLE_ = sorted(resdic['.got.plt'])[0] # 왠지는 모르겠는데, 아무튼 PIE 바이너리에서는 "어쩌구"+ ".got.plt"의 시작주소 가 key가된다.
-											             # TODO : 만약에 relro 가 적용되있으면, 이것도 마찬가지로 테이블이름이 got.plt 가 아니라 미묘하게 달를수도??? 
+											             # TODO: 만약에 relro 가 적용되있으면, 이것도 마찬가지로 테이블이름이 got.plt 가 아니라 미묘하게 달를수도??? 
 	else:
 		_GLOBAL_OFFSET_TABLE_ = 0
 	for SectionName in CodeSections_WRITE:

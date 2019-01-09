@@ -27,30 +27,57 @@ def backward_slice(resdic, SectionName, ADDR): # resdic[SectionName][ADDR] 를 �
 			return addrlist[i-1]
 	return -1
 
-def VSA_is_memoryAddr_ornot(resdic, SectionName, ADDR, orig_i, theHexValue):
+# TODO: 일시적으로 비활성해줌. 왜냐하면 date에 
+'''
+	addl $0x805a953, %eax
+	#=> ADDR:0x80494df BYTE:0553a90508
+	이런게 있기때문임...
+'''
+
+# URGENT: 내가 하고자하는게 : 해당라인에있는 hex값이 memory reference라면 true리턴, 아니라면 false리턴. 
+#         그러면 아래 date사태는 어케해결하냐? 
+#         "무에서유창조" 인스트럭션들(아무것도없는 황무지상태의 reg에 한방울 단비를 내리는 인스트럭션) ex) lea, mov, xor eax,eax 등등
+#         ㄴ 이것도 잠자는 에뮬레이션모듈의 코털을 건드리도록 하자. 
+def VSA_is_memoryAddr_ornot(DISASM): 
+	INSTRUCTION_CONTAINING_MEMREF = []
+	INSTRUCTION_CONTAINING_MEMREF.append(' call')
+	INSTRUCTION_CONTAINING_MEMREF.append(' clflush')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
+	INSTRUCTION_CONTAINING_MEMREF.append(' ')
 	# resdic[SectionName][ADDR][1] 중에서 original line 만을 pick한다. 
 	# 왜냐면 VSA에는 내가 추가한 라인이아니라, 오로지 원본바이너리의 원본라인만을 취하여 VSA해야하기 때문이다. 
 
-	# TODO: 일시적으로 비활성해줌. 왜냐하면 date에
-	'''
-	addl $0x805a953, %eax
-	#=> ADDR:0x80494df BYTE:0553a90508
-	이런게 있기때문ㅇ 
-	'''
 	
-	_instr = resdic[SectionName][ADDR][1][orig_i].replace('0x','') # line
-	_hexvl = str(hex(theHexValue)).replace('0x','') # hex string
-	backward_addr = backward_slice(resdic, SectionName, ADDR)
-
-	if 'add' in _instr:
-		orig_j_list = pickpick_idx_of_orig_disasm(resdic[SectionName][backward_addr][1]) 
-		orig_j = orig_j_list[0] # 우선은 첫번째의 j라고 가정하쟈. 어차피 뭐가됬던 call get_pc_thunk 은 안바뀔테니.
-		if 'get_pc_thunk' in resdic[SectionName][backward_addr][1][orig_j]:
-			print "_______________________________________________"
-			print resdic[SectionName][backward_addr][1][orig_j]
-			print _instr
-			print ""
-			return False
+	# call, jmp (*)
 
 	return True
 	

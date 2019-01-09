@@ -235,7 +235,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					dics_of_text[int(i.address)] =  [
 												'', 
 												[_rep], 
-												'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + _byte,
+												'                              #=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + _byte,
 												'',
 												''
 												]
@@ -276,13 +276,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				_errorcode = 'default'
 			
 
-			#[BUG-C] CAPSTONE 0x66, 0x90 TO 'nop' ISSUE HANDLING 
+			#[BUG-D] CAPSTONE 0x66, 0x90 TO 'nop' ISSUE HANDLING 
 			if binascii.hexlify(i.bytes) == '6690':
 				_errorcode = 'goto data' # 데이터처리 부분으로 보내버리기 
 				break # restart "cs.disasm"
 			
 
-			#[BUG-D] wrong mov suffix when source register is segment register... https://github.com/aquynh/capstone/issues/1240
+			#[BUG-E] wrong mov suffix when source register is segment register... https://github.com/aquynh/capstone/issues/1240
 			if i.mnemonic.startswith('mov'):
 				SegmentRegister = ['%cs','%ds','%ss','%es','%gs','%fs']
 				Reg = i.op_str.split(', ')[0]
@@ -291,14 +291,14 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					_errorcode = 'default'
 
 
-			#[BUG-E] Capstone disassembles [ff 15 00 00 00 00] to 	[calll *]... https://github.com/aquynh/capstone/issues/1241
+			#[BUG-F] Capstone disassembles [ff 15 00 00 00 00] to 	[calll *]... https://github.com/aquynh/capstone/issues/1241
 			if i.mnemonic.startswith('call'):
 				if i.op_str == '*':
 					MY_op_str = '*0x00'
 				_errorcode = 'default'
 
 
-			#[BUG-F] SRC and DEST location changed! on bound instruction... https://github.com/aquynh/capstone/issues/1242 
+			#[BUG-G] SRC and DEST location changed! on bound instruction... https://github.com/aquynh/capstone/issues/1242 
 			# (버그있는)as에게 주기위해서 MY_op_str를 설정해주지만, 위대하신 keystone-capstone 은 올바른 disassembly를 입력받길원하시므로 
 			if i.mnemonic.startswith('bound'):
 				BOUNDinst = i.op_str.split(', ')
@@ -306,16 +306,26 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				DISASSEMBLY_for_reassemble = i.mnemonic + _displacement + i.op_str
 				_errorcode = 'default'
 
-			#TODO: 이거 working 하게 고치기
-			# [BUG-E] lea 0x0(%edi,%eiz,1),%edi 의 7 byte nop을  lea  0x0(%edi),%edi 으로 디스어셈블함 ㅠ 
+			# 이거 왜 비활성화해줬냐면.. lea 0x804fd20(,%eax,4),%ebx 이것도 바이트패턴으로 디스어셈블해가지구
+			# 데이터처럼 생겨버려가지고
+			# 심볼화해야할 0x804fd20 심볼화를 못해서 ㅎㅅㅎ...... 
+			# 그리고 생각해보면 이걸 굳이 핸들링 해주는게 의미가 있을까 싶음...
 			'''
-			if i.mnemonic.startswith('lea') and len(i.bytes) == 7:
-				print "######################################################################"
-				print i.mnemonic
-				print i.op_str
-				print binascii.hexlify(i.bytes)
-				_errorcode = 'goto data' # 8dbc2700000000
-				break
+			# [BUG-EvictedFromBugList:)] lea 0x0(%edi,%eiz,1),%edi 의 7 byte nop을  lea  0x0(%edi),%edi 으로 디스어셈블함 ㅠ 
+			if i.mnemonic.startswith('lea') and  i.size is 7:
+				MY_bytes = binascii.hexlify(i.bytes)
+				for k in xrange(len(binascii.hexlify(i.bytes))):
+					j = len(binascii.hexlify(i.bytes)) -1 - k
+					if j % 2 is 0 : # 짝수인덱스는 곧 홀수번째 요소를 의미하므로. 홀수번째 요소 앞에 ', 0x'가 들어가야함. 
+						MY_bytes = MY_bytes[:j] + ', 0x' + MY_bytes[j:]
+				MY_bytes = MY_bytes[2:] # 처음의 ', '를 빼준다
+
+				# MY_mnemoonic, _displacement, MY_op_str 를 모두 새값으로 설정해주자.
+				MY_mnemoonic = '.byte'
+				_displacement = ''
+				MY_op_str = MY_bytes
+
+				_errorcode = 'default' # 8dbc2700000000
 			'''
 
 			# [ADDITIONAL FEATURE] undocumented instruction salc handling
@@ -323,22 +333,18 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				_errorcode = 'goto data'
 				break
 			
+
 			#[DEFAULT-A] NORMAL DISASSEMBLE
 			if _errorcode == 'default' :	
 				if MY_op_str=='':
 					MY_op_str = i.op_str
-				else:
-					"MY_op_str has already set becaust of [BUG-C]"
-
 				if MY_mnemoonic=='':
 					MY_mnemoonic = i.mnemonic
-				else:
-					"MY_mnemoonic has already set because of [BUG-B]"
 
 				dics_of_text[int(i.address)] =   [
 											'', 
 											[str(' ' + MY_mnemoonic + _displacement + ' ' + MY_op_str)], 
-											'#=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + binascii.hexlify(i.bytes),
+											'                              #=> ' + 'ADDR:' + str(hex(i.address)) + ' BYTE:' + binascii.hexlify(i.bytes),
 											'',
 											''
 											]
@@ -371,24 +377,24 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				MY_op_str = ''   # init
 				MY_mnemoonic = '' # init
 
-				# p_rint "============================================="
-				# p_rint "mnemonic     : {}".format(i.mnemonic)   
-				# p_rint "op_str       : {}".format(i.op_str)   
-				# p_rint 
-				# p_rint "groups       : {}".format(i.groups)    
-				# p_rint "regs_read    : {}".format(i.regs_read)   
-				# p_rint "regs_write   : {}".format(i.regs_write)
-				# p_rint 
-				# p_rint "inst ID      : {}".format(i.id)   # instruction ID 
-				# p_rint "size         : {}".format(i.size) # length of instruction
-				# p_rint "prefix       : {}".format(i.prefix)
-				# p_rint "opcode       : {}".format(i.opcode)
-				# p_rint "addr_size    : {}".format(i.addr_size)
-				# p_rint "modrm        : {}".format(i.modrm)
-				# p_rint "disp         : {}".format(i.disp)
-				# p_rint "sib          : {}".format(i.sib)
-				# p_rint "instruction  : {}".format(binascii.hexlify(i.bytes)) # real byte of instruction
-				# p_rint ""
+				# logging("=============================================")
+				# logging("mnemonic     : {}".format(i.mnemonic)   )
+				# logging("op_str       : {}".format(i.op_str)   )
+				# logging("")
+				# logging("groups       : {}".format(i.groups)    )
+				# logging("regs_read    : {}".format(i.regs_read)   )
+				# logging("regs_write   : {}".format(i.regs_write))
+				# logging("")
+				# logging("inst ID      : {}".format(i.id)   # instruction ID )
+				# logging("size         : {}".format(i.size) # length of instruction)
+				# logging("prefix       : {}".format(i.prefix))
+				# logging("opcode       : {}".format(i.opcode))
+				# logging("addr_size    : {}".format(i.addr_size))
+				# logging("modrm        : {}".format(i.modrm))
+				# logging("disp         : {}".format(i.disp))
+				# logging("sib          : {}".format(i.sib))
+				# logging("instruction  : {}".format(binascii.hexlify(i.bytes)) # real byte of instruction)
+				# logging("")
 				
 				
 				 
@@ -399,7 +405,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				dics_of_text[_saddress] = 	[
 											'', 
 											[' .byte 0x' + binascii.hexlify(_scontents[_offset:_offset+1])], 
-											'#=> ' + 'ADDR:' + str(hex(_saddress)) + ' BYTE:' + binascii.hexlify(_scontents[_offset:_offset+1]),
+											'                              #=> ' + 'ADDR:' + str(hex(_saddress)) + ' BYTE:' + binascii.hexlify(_scontents[_offset:_offset+1]),
 											'',
 											''
 											]
@@ -425,7 +431,7 @@ def binarydata2dic(filename):
 	f = open(filename,'r')
 	binfile = f.read()
 	
-	for SectionName in DataSections_IN_resdic:
+	for SectionName in DataSections_WRITE:
 		if SectionName == '.bss': # bss 는 초기화되면서 0으로 채워질것이기 때문에 데이터를 굳이 때려박지 않아도 된다고 함...
 			continue
 		if bin.get_section_by_name(SectionName) != None: # 섹션이 있는지 검사
@@ -442,7 +448,7 @@ def binarydata2dic(filename):
 				dics_of_data[addr] = [
 								'', 
 								[' .byte 0x' + _byte], 
-								'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' +_byte, 
+								'                              #=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' +_byte, 
 								'',
 								''
 								]
@@ -459,7 +465,7 @@ def binarydata2dic(filename):
 		dics_of_data[addr] = [
 						'', 
 						[' .byte 0x00'],
-						'#=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' + '00', 
+						'                              #=> ' + 'ADDR:' + str(hex(addr)) + ' BYTE:' + '00', 
 						'',
 						''
 						]
@@ -472,7 +478,7 @@ def binarycode2dic(filename, SHTABLE):
 	f = open(filename, 'rb')
 	fread = f.read()
 	
-	SectionName = CodeSections_IN_resdic
+	SectionName = CodeSections_WRITE
 	resdic = {}
 	
 	for _sname in SectionName:
@@ -487,11 +493,6 @@ def binarycode2dic(filename, SHTABLE):
 			"no.."
 	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
-
-
-
-
-
 
 
 
@@ -562,13 +563,6 @@ def get_relocation_tables(filename): # TODO: get_relocation_tables 함수이름 
 					RET['STT_NOTYPE'].update({ADDR:symname})
 
 	return RET
-
-
-
-
-
-
-
 
 
 

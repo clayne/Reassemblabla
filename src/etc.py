@@ -11,6 +11,193 @@ from optparse import OptionParser
 import binascii 
 from global_variables import *
 
+def one_operand_instruction(DISASM):
+	if ',' not in DISASM: return True
+	else: return False 
+
+def unsigned2signed(integervalue): 
+	if integervalue > 0xffffffff: # 8byte long
+		if integervalue > 0x7fffffffffffffff:
+			ret = integervalue ^ 0xffffffffffffffff
+			ret = ret + 1
+			ret = (-1) * ret
+			return ret
+		else:
+			return integervalue		
+	else:
+		if integervalue > 0x7fffffff:
+			ret = integervalue ^ 0xffffffff
+			ret = ret + 1
+			ret = (-1) * ret
+			return ret
+		else:
+			return integervalue
+
+def signed2unsigned(integervalue):
+	if integervalue < 0:
+		if integervalue < (-1) * 0x7fffffff: # 8byte의 int이당. 
+			integervalue = (-1) * integervalue
+			integervalue = integervalue - 1
+			ret = integervalue ^ 0xffffffffffffffff
+			return ret
+		else: # 일반적인 4byte의 int이당.  
+			integervalue = (-1) * integervalue
+			integervalue = integervalue - 1
+			ret = integervalue ^ 0xffffffff
+			return ret
+	else:
+		return integervalue
+
+def instruction_div(edx, eax, divisor):
+	# 나누어지는수는 long(8byte)로서 edx + eax 를 조립해서 만든다. 
+	eax = '{0:x}'.format(eax).zfill(8)
+	edx = '{0:x}'.format(edx).zfill(8)
+	divident = int('0x' + edx + eax, 16)
+
+	quotient = divident / divisor
+	remainder = divident % divisor
+	return quotient, remainder
+
+def instruction_idiv(edx, eax, divisor):
+	# 나누어지는수는 long(8byte)로서 edx + eax 를 조립해서 만든다. 
+	eax = '{0:x}'.format(eax).zfill(8)
+	edx = '{0:x}'.format(edx).zfill(8)
+	divident = int('0x' + edx + eax, 16)
+
+	divident_signed = unsigned2signed(divident)
+	divisor_signed  = unsigned2signed(divisor)
+
+	quotient = divident_signed / divisor_signed
+	remainder = divident_signed % divisor_signed
+
+	return signed2unsigned(quotient), signed2unsigned(remainder)
+
+
+def instruction_mul(v1, v2):
+	res = v1 * v2
+	res = hex(res)
+	print res
+	res = res.replace('L','').replace('0x','')
+	print len(res)
+	if len(res) > 8:
+		rightpart = '0x' + res[-8:]
+		leftpart  = '0x' + res[:-8]
+	else:
+		rightpart = '0x' + res
+		leftpart  = '0x' + '0'
+
+	return int(leftpart, 16), int(rightpart, 16)
+
+def instruction_imul(v1, v2):
+	v1 = unsigned2signed(v1)
+	v2 = unsigned2signed(v2)
+	res = v1*v2
+	if res >= 0:
+		res = hex(res)
+	elif res < 0:
+		res = hex(signed2unsigned(res))
+	print "res : {}".format(res)
+	res = res.replace('L','').replace('0x','')
+	print "res : {}".format(res)
+	if len(res) > 8:
+			rightpart = '0x' + res[-8:]
+			leftpart  = '0x' + res[:-8]
+	else:
+		rightpart = '0x' + res
+		leftpart  = '0x' + '0'
+	
+	return int(leftpart, 16), int(rightpart, 16)
+
+def bitflip_the_index(idx, register_value):
+	idx = idx%32 # 이제 인덱스가 나왓다. 
+	idx = 31-idx # array 는 젤위가 인덱스0이니깐... 
+	BIN_register_value = str('{0:32b}'.format(register_value)) # 길이 32짜리 2진수값으로 변환
+	BIN_register_value = BIN_register_value.replace(' ','0') # 맨앞은 space로 채워지는 경향이있는데 걍 0으로 바꿈
+	if BIN_register_value[idx] == '1':
+		BIN_register_value = BIN_register_value[0:idx] + '0' + BIN_register_value[idx+1:]
+	elif BIN_register_value[idx] == '0':
+		BIN_register_value = BIN_register_value[0:idx] + '1' + BIN_register_value[idx+1:]
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitset_the_index(idx, register_value):
+	idx = idx%32 # 이제 인덱스가 나왓다. 
+	idx = 31-idx # array 는 젤위가 인덱스0이니깐... 
+	BIN_register_value = str('{0:32b}'.format(register_value)) # 길이 32짜리 2진수값으로 변환 ' '로채워져 '0'이아니라.
+	BIN_register_value = BIN_register_value.replace(' ','0')
+	if BIN_register_value[idx] == '1':
+		'nothing to do'
+	elif BIN_register_value[idx] == '0':
+		BIN_register_value = BIN_register_value[0:idx] + '1' + BIN_register_value[idx+1:]
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitreset_the_index(idx, register_value):
+	idx = idx%32 # 이제 인덱스가 나왓다. 
+	idx = 31-idx # array 는 젤위가 인덱스0이니깐... 
+	BIN_register_value = str('{0:32b}'.format(register_value)) # 길이 32짜리 2진수값으로 변환
+	BIN_register_value = BIN_register_value.replace(' ','0') # 맨앞은 space로 채워지는 경향이있는데 걍 0으로 바꿈
+	if BIN_register_value[idx] == '1':
+		BIN_register_value = BIN_register_value[0:idx] + '0' + BIN_register_value[idx+1:]
+	elif BIN_register_value[idx] == '0':
+		'nothing to do'
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitrotate_the_index(idx, register_value, direction):
+	idx = idx%32
+	BIN_register_value = str('{0:32b}'.format(register_value)) 
+	BIN_register_value = BIN_register_value.replace(' ','0')
+	if direction == 'right':
+		BIN_register_value =  BIN_register_value[(-1)*idx:] + BIN_register_value[:(-1)*idx]
+	elif direction == 'left':
+		BIN_register_value =  BIN_register_value[idx:] + BIN_register_value[:idx]
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitshift_the_index(idx, register_value, direction):
+	idx = idx%32
+	BIN_register_value = str('{0:32b}'.format(register_value)) 
+	BIN_register_value = BIN_register_value.replace(' ','0')
+	if direction == 'right':
+		BIN_register_value =  '0'*idx + BIN_register_value[:(-1)*idx]
+	elif direction == 'left':
+		BIN_register_value =  BIN_register_value[idx:] + '0'*idx
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitshift_arithmetic_the_index(idx, register_value, direction):
+	# 비트들을 shift하되, most lowest bit/most highest bit 는 원본value의 값을 고대로 유지한다. 즉 10000000 을 3만큼 shift arithmetic right하면 11110000 이다 
+	idx = idx%32
+	BIN_register_value = str('{0:32b}'.format(register_value)) 
+	BIN_register_value = BIN_register_value.replace(' ','0')
+	if direction == 'right':
+		mosthighbit = BIN_register_value[0]
+		BIN_register_value =  mosthighbit*idx + BIN_register_value[:(-1)*idx]
+	elif direction == 'left':
+		mostlowbit = BIN_register_value[-1]
+		BIN_register_value =  BIN_register_value[idx:] + mostlowbit*idx
+	return int(BIN_register_value, 2)%0x100000000
+
+def bitscan(register_value, direction):
+	register_value = register_value%0x100000000
+	BIN_register_value = str('{0:32b}'.format(register_value)) 
+	BIN_register_value = BIN_register_value.replace(' ','0')
+	if direction == 'right':
+		for idx in xrange(32):
+			if BIN_register_value[idx] == '1':
+				return 31-idx # 스트링 인덱스는 거꾸로 간다
+	elif direction == 'left':
+		for idx in xrange(32):
+			idx = 31-idx
+			if BIN_register_value[idx] == '1':
+				return 31-idx
+	return -1
+
+def there_is_no_memory_reference(line):
+	if '#' in line:
+		line = line[:line.index('#')]
+	if '(' in line and ')' in line:
+		return False
+	else:
+		return True
+
+
 def list_insert(position, list1, list2):
 	return list1[:position] + list2 + list1[position:]
 
@@ -49,7 +236,6 @@ def ldd(filename):
 			libraries.append(l.split('=>')[1].strip())
 	return libraries
 
-
 def get_soname(filename):
 	try:
 		out = subprocess.check_output(['objdump', '-p', filename])
@@ -68,6 +254,26 @@ def extract_register(line):
 		line = line[line.index('%')+1:]
 		reglist.append(line[:3])
 	return reglist
+
+
+def classificate_registers(line):
+	ret = {'REFERENCE_REGISTER':[], 'ORDINARY_REGISTER':[]}
+	i1 = i2 = -1
+	if ('(') in line: # () 는 나올거면 단 한번만 출현함 
+		i1 = line.index('(') 
+		i2 = line.index(')')
+
+	if i1 == -1:
+		REGREF_ARGUMENTS = ''
+	else:
+		REGREF_ARGUMENTS = line[i1:i2 + 1]
+		line = line.replace(REGREF_ARGUMENTS,'')
+
+	ret['REFERENCE_REGISTER'] = extract_register(REGREF_ARGUMENTS)
+	ret['ORDINARY_REGISTER']  = extract_register(line)
+	return ret
+
+
 
 def ishex(str):
 	for i in range(len(str)):
@@ -112,7 +318,7 @@ def extract_hex_addr(line):
 			else: # 양수라면 
 				if ishex(line[i]): 
 					addrlist.append(int('0x'+line[i],16)) 
-			
+
 	return addrlist
 
 
@@ -170,34 +376,16 @@ def findmain(file_name, resdic, __libc_start_main_addr, CHECKSEC_INFO):
 
 
 
-
 def findstart(file_name):
 	entrypoint = ELFFile(open(file_name,'rb')).header.e_entry
 	return entrypoint
-	
-# TODO: 함수 없애버리자. 
-def remove_brackets(dics_of_text):
-	'''
-	
-	# TODO 
-	ex) 
-	   call  1b54b <main@@Base+0xc0ab>  --> call   1b54b
-	'''
-	for i in range(0,len(dics_of_text)):
-		try:
-			line = dics_of_text.values()[i][1]
-			index1 = line.index('<')
-			index2 = line.index('>')
-			dics_of_text.values()[i][1] = line[:index1] + line[index2+1:]
-		except:
-			"dummy"
+
 # TODO:이 함수 없애버리자. 애초에 UNKNOWN 심볼은 테이블에 추가되지도 않으니 
 def eliminate_weird_GLOB_DAT(T_glob):
 	# GLOB_DAT 심볼일 자격이 없는얘들을 제명... 
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']  
 
-	
-	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']# TODO: 리스트 추가... 제명리스트..# 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다... 이런것들이 더있으면 추가하라.
+	eliminate = ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']# 제명리스트.. 제명대상의 공통점으로는... GLOB_DAT임과 동시에 .rel.dyn 에서 심볼이름의 뒤에 @GLIBC 가 붙지 않는다는 점이다... 이런것들이 더있으면 추가하라.
 	for key in T_glob.keys():
 		if T_glob[key] in eliminate: 
 			del T_glob[key]
@@ -225,7 +413,7 @@ def get_shtable(filename): # 섹션들에 대한 정보들을 가지고있는 �
 	f.close()
 	return SHTABLE
 
-def gen_assemblescript(LOC, filename):
+def gen_assemblescript(LOC, filename):   
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
 		linux-gate.so.1 =>  (0xf774f000)
@@ -360,7 +548,7 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
 
-	# 이거 이제 좆도필요없음. 왜냐면 main의 시작부분에 다이나믹하게 _GLOBAL_OFFSET_TABLE_ 의 값을 구해올수 있기 때문임. 
+	# 이거 이제 필요없음. 왜냐면 main의 시작부분에 다이나믹하게 _GLOBAL_OFFSET_TABLE_ 의 값을 구해올수 있기 때문임. 
 	'''
 	if CHECKSEC_INFO.relro == 'Full': # _GLOBAL_OFFSET_TABLE 이 .got 의 시작이다. .got 는 .dynamic 뒤에 따라온다. 
 		f.write(".section .dynamic\n")

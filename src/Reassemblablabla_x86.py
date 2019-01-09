@@ -72,6 +72,8 @@ if __name__=="__main__":
 	resdic = binarycode2dic(options.filename, SHTABLE)
 	resdic_data = binarydata2dic(options.filename)
 	resdic.update(resdic_data)
+	
+
 	CHECKSEC_INFO = pwnlib.elf.elf.ELF(options.filename, False)
 
 
@@ -84,10 +86,8 @@ if __name__=="__main__":
 
 
 
-
-
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
-	# eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # COMMENT: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
+	#eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # COMMENT: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
 
 
 
@@ -99,6 +99,7 @@ if __name__=="__main__":
 
 	# pie바이너리를 위한 테이블수정이 살짝 있겠습니다...
 	if CHECKSEC_INFO.pie == True:
+		logging("now concat_symbolname_to_TABLE")
 		concat_symbolname_to_TABLE(T_rel['STT_OBJECT'], '@GOT(REGISTER_WHO)') # TODO: 근데 굳이 GOT relative access 를 안해도 되잖아? -->아냐... GOT based access가 아니면 컴파일러가 불평해 
 		# concat_symbolname_to_TABLE(T_rel['STT_FUNC'], '@PLT') # COMMENT : 이렇게 하면 링킹을 못해오는 경우가 발생. 그래서 그냥 @PLT 빼줬다. 
 		
@@ -110,7 +111,7 @@ if __name__=="__main__":
 
 
 	# ==심볼이름 레이블링==. 레이블링 순서는 휘발성이강하고(weak) 국소적인 이름부터한다. 1. Relocation section table 2. Weak symbol 3. Global symbol
-	logging("now labeling")
+	logging("now dynamic_symbol_labeling...")
 	dynamic_symbol_labeling(resdic, T_plt2name) 
 	dynamic_symbol_labeling(resdic, T_rel['STT_OBJECT']) 
 	########### dynamic_symbol_labeling(resdic, T_rel['STT_NOTYPE']) # STT_NOTYPE 은 절대심볼화안해줌 ㅋ 
@@ -132,22 +133,12 @@ if __name__=="__main__":
 
 	startaddr = findstart(options.filename)
 
+
 	if mainaddr == -1: 
 		resdic['.text'][startaddr][0] = SYMPREFIX[0] + "MYSYM_ENTRY:" # "_start:" 가 들어가면, 왠진모르겠지만 라이브러리의 call _start 에서 이상한 곳을 CALL 하게된다. 
 	else: 
 		resdic['.text'][mainaddr][0] = "main:"
 
-
-
-	# 심볼라이즈 전에 brackets를 다 제거해야징
-	# TODO: 이거 안해도 될것같은데? 없어도 될듯..ㅋ 
-	'''
-	logging("now remove_brackets")
-	for SectionName in CodeSections_WRITE:
-		if SectionName in resdic.keys():
-			remove_brackets(resdic[SectionName]) 
-	'''
-	
 
 	# get_pc_thunk 같은게 있을경우 이거 심볼라이즈
 	logging("now getpcthunk_labeling")
@@ -163,6 +154,7 @@ if __name__=="__main__":
 	# ===calculated address 심볼라이즈===
 	logging("now PIE_set_getpcthunk_loc")
 	PIE_set_getpcthunk_loc(resdic) # get_pc_thunk 를 호출하는 라인의 EIP를 resdic[name][3]에다가 쓴다. 주의: get_pc_thunk를 호출하는지안하는지는 symbolize_textsection 을 거친후에야 알수있음
+	logging("now PIE_calculated_addr_symbolize")
 	PIE_calculated_addr_symbolize(resdic)
 	
 

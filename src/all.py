@@ -32,7 +32,7 @@ def get_binary_file(mypath):
 
 # main
 if len(sys.argv) != 2:
-	print "[*] Usage : tmp.py [PATH of coreutils binary]"
+	print "[*] Usage : all.py [PATH of coreutils binary]"
 	sys.exit(1)
 mypath = sys.argv[1]
 

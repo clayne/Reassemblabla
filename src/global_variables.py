@@ -1,26 +1,402 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
+import re
 
+# TODO: 이름 좀 직관적이게 바꾸기... CodeSection_LIST_WRITE, DataSection_LIST_WRITE
 CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.plt.got','.plt']
 DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata','.got.plt'] # <.jcr> added for handling pie binary.
-AllSections_WRITE = CodeSections_WRITE + DataSections_WRITE
+AllSections_WRITE  = CodeSections_WRITE + DataSections_WRITE
 
 MyNamedSymbol = ['main', '__x86.get_pc_thunk']
-
-CodeSections_IN_resdic = CodeSections_WRITE # TODO: 이거 없애준다음에 코드전반적으로 이거호출하는것도 수정하기. 
-DataSections_IN_resdic = DataSections_WRITE 
-
-AllSection_IN_resdic = CodeSections_IN_resdic + DataSections_IN_resdic
 
 TreatThisSection2TEXT = ['.init','.fini', '.ctors', '.dtors', '.plt.got', '.plt']
 TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got', '.got.plt']
 
 DoNotWriteThisSection = [] # 걍 다 써줘봐봐우선. 
-
-# for gen_assemblescript... Why crtn
-# crts = "/usr/lib/i386-linux-gnu/crtn.o" # original...
-# crts = "/usr/lib/i386-linux-gnu/crtn.o /usr/lib/i386-linux-gnu/crti.o "   # -> after execute binary, segfault happens
-# crts = "/usr/lib/i386-linux-gnu/crtn.o /usr/lib/i386-linux-gnu/crti.o /usr/local/lib/gcc/i686-pc-linux-gnu/5.5.0/crtbegin.o " -> linking error happens
 crts = "/usr/lib/i386-linux-gnu/crtn.o "
-
 SYMPREFIX = ['']
+
+
+
+
+# global regex
+_ = '.*?'
+REG1REF = _ + '(0x)?' + '[0-9a-f]+' +  _ + '%' + _  	# 0x12(%ebx)
+REG    = _ + '%' + _ 						   	   		# %eax
+IMM    = _ + '(\$)' + '(0x)?' + '[0-9a-f]+' + _   		# $0x123. TODO: 앞에원래 '(\$)?' 였는데 IMM값은 $가 꼭 있어야해서 수정해줬음. 뭔가 문제생길시 의심해보자. 
+RM32 = {}
+
+# Memory reference
+RM32['M_REG']    = _ + '[(]' + _ + '%' + _ + '[)]' + _ 		# R이긴 한데 메모리레퍼런스에 쓰이는 R (%eax) / (%eax, %ebx, 4)
+RM32['M_HEX']    = _ + '(0x)?' + '[0-9a-f]+' + _ 			# M32. 0x1234
+# Just register...
+RM32['R_REG']        = REG	
+
+# 근데 사실 RM32['M']  는 쓸모없는게, 왜냐면 애초에 이러케 헥스값으로다가 생겨먹은얘들은 symbolize단계에서 다 심볼화된상태이기때문임. 
+p_cmp = []
+p_cmp.append(re.compile(' cmp' + IMM + REG1REF))
+p_cmp.append(re.compile(' cmp' + REG1REF + REG))
+p_cmp.append(re.compile(' cmp' + REG + REG1REF))
+
+
+
+p_PATTERN_01  = [] # instruction + REG + RM32['R']
+p_PATTERN_01R = [] # instruction + REG + RM32['R']
+p_PATTERN_02  = [] # instruction + RM32['R'] + REG
+p_PATTERN_02R = [] # instruction + RM32['R'] + REG
+p_PATTERN_03  = [] # instruction + IMM + RM32['R']
+p_PATTERN_03R = []
+p_PATTERN_04  = [] # instruction + RM32['R'] + IMM
+p_PATTERN_04R = [] # instruction + RM32['R'] + IMM
+p_PATTERN_05  = [] 
+
+p_PATTERN_01.append(re.compile(' adc'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' add'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' and'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' btc'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' btr'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' bts'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' bt'      + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' cmpxchg' + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' cmp'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' mov'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' or'      + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' sbb'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' sub'     + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' test'    + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' xadd'    + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' xchg'    + REG + RM32['M_REG']))
+p_PATTERN_01.append(re.compile(' xor'     + REG + RM32['M_REG']))
+
+# p_PATTERN_01R.append(re.compile(' adc'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' add'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' and'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+p_PATTERN_01R.append(re.compile(' btc'     + REG + RM32['R_REG']))
+p_PATTERN_01R.append(re.compile(' btr'     + REG + RM32['R_REG']))
+p_PATTERN_01R.append(re.compile(' bts'     + REG + RM32['R_REG']))
+p_PATTERN_01R.append(re.compile(' bt'      + REG + RM32['R_REG']))
+p_PATTERN_01R.append(re.compile(' cmpxchg' + REG + RM32['R_REG']))
+# p_PATTERN_01R.append(re.compile(' cmp'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' mov'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' or'      + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' sbb'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' sub'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+p_PATTERN_01R.append(re.compile(' test'    + REG + RM32['R_REG']))
+p_PATTERN_01R.append(re.compile(' xadd'    + REG + RM32['R_REG']))
+# p_PATTERN_01R.append(re.compile(' xchg'    + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+# p_PATTERN_01R.append(re.compile(' xor'     + REG + RM32['R_REG'])) # p_PATTERN_02R 에 동일한패턴 존재
+
+
+
+p_PATTERN_02.append(re.compile(' adc'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' add'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' and'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' bsf'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' bsr'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmova'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovae'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovb'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovbe'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovc'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmove'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovg'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovge'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovl'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovle'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovna'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnae' + RM32['M_REG'] + REG )) 
+p_PATTERN_02.append(re.compile(' cmovnb'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnbe' + RM32['M_REG'] + REG )) 
+p_PATTERN_02.append(re.compile(' cmovnc'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovne'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovng'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnge' + RM32['M_REG'] + REG )) 
+p_PATTERN_02.append(re.compile(' cmovnl'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnle' + RM32['M_REG'] + REG )) 
+p_PATTERN_02.append(re.compile(' cmovno'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnp'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovns'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovnz'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovo'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovp'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovpe'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovpo'  + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovs'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmovz'   + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' cmp'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' imul'    + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' lar'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' lsl'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' mov'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' or'      + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' sbb'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' sub'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' xchg'    + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' xor'     + RM32['M_REG'] + REG ))
+p_PATTERN_02.append(re.compile(' lea'     + RM32['M_REG'] + REG )) # lea 는 lea + m + r32 로 c9x.me에 나와있는데, m은 진짜 m임. "lea (%esi), %esi"이나 "lea 0x11111111, %edi" 는 가능하지만  "lea %esi, %esi"->불가 "lea $0x11111111, %edi"->불가 
+
+p_PATTERN_02R.append(re.compile(' adc'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' add'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' and'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' bsf'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' bsr'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmova'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovae'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovb'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovbe'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovc'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmove'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovg'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovge'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovl'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovle'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovna'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnae' + RM32['R_REG'] + REG )) 
+p_PATTERN_02R.append(re.compile(' cmovnb'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnbe' + RM32['R_REG'] + REG )) 
+p_PATTERN_02R.append(re.compile(' cmovnc'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovne'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovng'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnge' + RM32['R_REG'] + REG )) 
+p_PATTERN_02R.append(re.compile(' cmovnl'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnle' + RM32['R_REG'] + REG )) 
+p_PATTERN_02R.append(re.compile(' cmovno'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnp'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovns'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovnz'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovo'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovp'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovpe'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovpo'  + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovs'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmovz'   + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' cmp'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' imul'    + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' lar'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' lsl'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' mov'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' or'      + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' sbb'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' sub'     + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' xchg'    + RM32['R_REG'] + REG ))
+p_PATTERN_02R.append(re.compile(' xor'     + RM32['R_REG'] + REG ))
+# p_PATTERN_02R.append(' lea'     + RM32['R_REG'] + REG ) -> 없다이런룰은. 
+
+
+p_PATTERN_03.append(re.compile(' adc'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' add'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' and'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' btc'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' btr'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' bts'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' bt'      + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' cmp'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' mov'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' or'      + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' ror'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' rol'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' rcr'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' rcl'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' sal'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' sar'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' shl'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' shr'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' sbb'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' sub'     + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' test'    + IMM + RM32['M_REG']))
+p_PATTERN_03.append(re.compile(' xor'     + IMM + RM32['M_REG']))
+
+p_PATTERN_03R.append(re.compile(' adc'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' add'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' and'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' btc'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' btr'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' bts'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' bt'      + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' cmp'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' mov'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' or'      + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' ror'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' rol'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' rcr'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' rcl'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' sal'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' sar'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' shl'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' shr'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' sbb'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' sub'     + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' test'    + IMM + RM32['R_REG']))
+p_PATTERN_03R.append(re.compile(' xor'     + IMM + RM32['R_REG']))
+
+# 1-operand instruction
+p_PATTERN_04.append(re.compile(' call'  + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' dec'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' div'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' idiv'  + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' imul'  + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' inc'   + RM32['M_REG']))
+# p_PATTERN_04.append(re.compile(' jmp'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' j'     + RM32['M_REG'])) # j의 프랜드들을 고려안했네에,,,
+p_PATTERN_04.append(re.compile(' mul'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' neg'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' not'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' pop'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' push'  + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' sal'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' sar'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' shl'   + RM32['M_REG']))
+p_PATTERN_04.append(re.compile(' shr'   + RM32['M_REG']))
+
+p_PATTERN_04R.append(re.compile(' call'  + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' dec'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' div'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' idiv'  + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' imul'  + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' inc'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' j'     + RM32['R_REG'])) # jmp 관련된것들
+p_PATTERN_04R.append(re.compile(' mul'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' neg'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' not'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' pop'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' push'  + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' sal'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' sar'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' shl'   + RM32['R_REG']))
+p_PATTERN_04R.append(re.compile(' shr'   + RM32['R_REG']))
+
+
+# 0-operand instruction. TODO: 뒤에뭐 주석빼고는 아무것도 안붙어야할텐데.(아냐 절레절레. ret 0x10이런것만 보더라도 붙자나,,크흑 결과가 달라진다구우.) [주석 or notthing] 에 관한 regex 만들자
+p_PATTERN_05.append(re.compile(' cbw'      ))
+p_PATTERN_05.append(re.compile(' cwde'     ))
+p_PATTERN_05.append(re.compile(' clc'      ))
+p_PATTERN_05.append(re.compile(' cld'      ))
+p_PATTERN_05.append(re.compile(' cli'      ))
+p_PATTERN_05.append(re.compile(' clts'     ))
+p_PATTERN_05.append(re.compile(' cmc'      ))
+p_PATTERN_05.append(re.compile(' cmpsb'    ))
+p_PATTERN_05.append(re.compile(' cmpsw'    ))
+p_PATTERN_05.append(re.compile(' cmpsd'    ))
+p_PATTERN_05.append(re.compile(' cpuid'    ))
+p_PATTERN_05.append(re.compile(' cwd'      ))
+p_PATTERN_05.append(re.compile(' cdq'      ))
+p_PATTERN_05.append(re.compile(' daa'      ))
+p_PATTERN_05.append(re.compile(' das'      ))
+p_PATTERN_05.append(re.compile(' emms'     ))
+p_PATTERN_05.append(re.compile(' f2xm1'    ))
+p_PATTERN_05.append(re.compile(' fabs'     ))
+p_PATTERN_05.append(re.compile(' faddp'    ))
+p_PATTERN_05.append(re.compile(' fchs'     ))
+p_PATTERN_05.append(re.compile(' fclex'    ))
+p_PATTERN_05.append(re.compile(' fnclex'   )) 
+p_PATTERN_05.append(re.compile(' fcom'     ))
+p_PATTERN_05.append(re.compile(' fcomp'    ))
+p_PATTERN_05.append(re.compile(' fcompp'   )) 
+p_PATTERN_05.append(re.compile(' fcos'     ))
+p_PATTERN_05.append(re.compile(' fdecstp'  ))  
+p_PATTERN_05.append(re.compile(' fdivp'    ))
+p_PATTERN_05.append(re.compile(' fdivrp'   )) 
+p_PATTERN_05.append(re.compile(' ffree'    ))
+p_PATTERN_05.append(re.compile(' fincstp'  ))  
+p_PATTERN_05.append(re.compile(' finit'    ))
+p_PATTERN_05.append(re.compile(' fninit'   )) 
+p_PATTERN_05.append(re.compile(' fld1'     ))
+p_PATTERN_05.append(re.compile(' fldl2t'   )) 
+p_PATTERN_05.append(re.compile(' fldl2e'   )) 
+p_PATTERN_05.append(re.compile(' fldpi'    ))
+p_PATTERN_05.append(re.compile(' fldlg2'   )) 
+p_PATTERN_05.append(re.compile(' fldln2'   )) 
+p_PATTERN_05.append(re.compile(' fldz'     ))
+p_PATTERN_05.append(re.compile(' fmulp'    ))
+p_PATTERN_05.append(re.compile(' fnop'     ))
+p_PATTERN_05.append(re.compile(' fpatan'   )) 
+p_PATTERN_05.append(re.compile(' fprem'    ))
+p_PATTERN_05.append(re.compile(' fprem1'   )) 
+p_PATTERN_05.append(re.compile(' frndint'  ))  
+p_PATTERN_05.append(re.compile(' fscale'   )) 
+p_PATTERN_05.append(re.compile(' fsin'     ))
+p_PATTERN_05.append(re.compile(' fsincos'  ))  
+p_PATTERN_05.append(re.compile(' fsqrt'    ))
+p_PATTERN_05.append(re.compile(' fsubp'    ))
+p_PATTERN_05.append(re.compile(' fsubrp'   )) 
+p_PATTERN_05.append(re.compile(' ftst'     ))
+p_PATTERN_05.append(re.compile(' fucom'    ))
+p_PATTERN_05.append(re.compile(' fucomp'   )) 
+p_PATTERN_05.append(re.compile(' fucompp'  ))  
+p_PATTERN_05.append(re.compile(' fxam'     ))
+p_PATTERN_05.append(re.compile(' fxch'     ))
+p_PATTERN_05.append(re.compile(' fxtract'  ))  
+p_PATTERN_05.append(re.compile(' fyl2x'    ))
+p_PATTERN_05.append(re.compile(' fyl2xp1'  ))  
+p_PATTERN_05.append(re.compile(' hlt'      ))
+p_PATTERN_05.append(re.compile(' into'     ))
+p_PATTERN_05.append(re.compile(' invd'     ))
+p_PATTERN_05.append(re.compile(' iret'     ))
+p_PATTERN_05.append(re.compile(' lahf'     ))
+p_PATTERN_05.append(re.compile(' leave'    ))
+p_PATTERN_05.append(re.compile(' lfence'   )) 
+p_PATTERN_05.append(re.compile(' lock'     ))
+p_PATTERN_05.append(re.compile(' lodsb'    ))
+p_PATTERN_05.append(re.compile(' lodsw'    ))
+p_PATTERN_05.append(re.compile(' mfence'   )) 
+p_PATTERN_05.append(re.compile(' monitor'  ))  
+p_PATTERN_05.append(re.compile(' movsb'    ))
+p_PATTERN_05.append(re.compile(' movsw'    ))
+p_PATTERN_05.append(re.compile(' movsd'    ))
+p_PATTERN_05.append(re.compile(' mwait'    ))
+p_PATTERN_05.append(re.compile(' nop'      ))
+p_PATTERN_05.append(re.compile(' outsb'    ))
+p_PATTERN_05.append(re.compile(' outsw'    ))
+p_PATTERN_05.append(re.compile(' pause'    ))
+p_PATTERN_05.append(re.compile(' pusha'    ))
+p_PATTERN_05.append(re.compile(' pushf'    ))
+p_PATTERN_05.append(re.compile(' rdmsr'    ))
+p_PATTERN_05.append(re.compile(' rdpmc'    ))
+p_PATTERN_05.append(re.compile(' rdtsc'    ))
+p_PATTERN_05.append(re.compile(' ret'      ))
+p_PATTERN_05.append(re.compile(' rsm'      ))
+p_PATTERN_05.append(re.compile(' sahf'     ))
+p_PATTERN_05.append(re.compile(' scasb'    ))
+p_PATTERN_05.append(re.compile(' scasw'    ))
+p_PATTERN_05.append(re.compile(' sfence'   )) 
+p_PATTERN_05.append(re.compile(' stc'      ))
+p_PATTERN_05.append(re.compile(' std'      ))
+p_PATTERN_05.append(re.compile(' sti'      ))
+p_PATTERN_05.append(re.compile(' stosb'    ))
+p_PATTERN_05.append(re.compile(' stosw'    ))
+p_PATTERN_05.append(re.compile(' sysenter' ))   
+p_PATTERN_05.append(re.compile(' ud2'      ))
+p_PATTERN_05.append(re.compile(' wait'     ))
+p_PATTERN_05.append(re.compile(' fwait'    ))
+p_PATTERN_05.append(re.compile(' wbinvd'   )) 
+p_PATTERN_05.append(re.compile(' wrmsr'    ))
+p_PATTERN_05.append(re.compile(' xlatb'    ))
+
+
+p_PATTERN_INFORMATION_LOSS = []
+# TODO: pop %eax 하면 %eax 값이 loss되므로, 에물레이션 stop됨. 
+# 이렇게 register 값을 변경하는 인스트럭션 모아보기.
+
+
+
+
+
+
+
+
+
+
+
+# c9x에서 lea페이지를 보면서 깨달은게 m도 실제적으로는 REG1REF를 의미한다는걸 알았음. m 은 MYSYM이 될수도, 0x123(%eax) 이 될수도 있다. 
+
+
+
+# 원래있던것
+p_add     = re.compile(' add' + IMM + REG)                     # add $0x1b53, %ebx
+p_sar     = re.compile(' sar' + IMM + REG)                     # sar $0x2, %ebx
+p_lea     = re.compile(' lea' + RM32['M_REG'] + REG)                  # leal.d32 -3(%ebx), %eax
+p_mov     = re.compile(' mov' + RM32['M_REG'] + REG)                  # movl.d32 -3(%ebx), %eax
+p_xor     = re.compile(' xor' + REG + REG)                     # xorl %edi, %edi
+p_push    = re.compile(' push' + RM32['M_REG'])                       # pushl.d32 -0xc(%ebx)          
+p_call    = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
+p_bracket = re.compile('\<.*?\>')
