@@ -1,0 +1,646 @@
+
+encrypted:     file format elf32-i386
+
+
+Disassembly of section .interp:
+
+08048134 <.interp>:
+ 8048134:	2f                   	das    
+ 8048135:	6c                   	insb   (%dx),%es:(%edi)
+ 8048136:	69 62 2f 6c 64 2d 6c 	imul   $0x6c2d646c,0x2f(%edx),%esp
+ 804813d:	69 6e 75 78 2e 73 6f 	imul   $0x6f732e78,0x75(%esi),%ebp
+ 8048144:	2e 32 00             	xor    %cs:(%eax),%al
+
+Disassembly of section .note.ABI-tag:
+
+08048148 <.note.ABI-tag>:
+ 8048148:	04 00                	add    $0x0,%al
+ 804814a:	00 00                	add    %al,(%eax)
+ 804814c:	10 00                	adc    %al,(%eax)
+ 804814e:	00 00                	add    %al,(%eax)
+ 8048150:	01 00                	add    %eax,(%eax)
+ 8048152:	00 00                	add    %al,(%eax)
+ 8048154:	47                   	inc    %edi
+ 8048155:	4e                   	dec    %esi
+ 8048156:	55                   	push   %ebp
+ 8048157:	00 00                	add    %al,(%eax)
+ 8048159:	00 00                	add    %al,(%eax)
+ 804815b:	00 02                	add    %al,(%edx)
+ 804815d:	00 00                	add    %al,(%eax)
+ 804815f:	00 06                	add    %al,(%esi)
+ 8048161:	00 00                	add    %al,(%eax)
+ 8048163:	00 20                	add    %ah,(%eax)
+ 8048165:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .hash:
+
+08048168 <.hash>:
+ 8048168:	03 00                	add    (%eax),%eax
+ 804816a:	00 00                	add    %al,(%eax)
+ 804816c:	04 00                	add    $0x0,%al
+ 804816e:	00 00                	add    %al,(%eax)
+ 8048170:	01 00                	add    %eax,(%eax)
+ 8048172:	00 00                	add    %al,(%eax)
+ 8048174:	03 00                	add    (%eax),%eax
+ 8048176:	00 00                	add    %al,(%eax)
+ 8048178:	02 00                	add    (%eax),%al
+	...
+
+Disassembly of section .dynsym:
+
+0804818c <.dynsym>:
+	...
+ 804819c:	2c 00                	sub    $0x0,%al
+	...
+ 80481a6:	00 00                	add    %al,(%eax)
+ 80481a8:	20 00                	and    %al,(%eax)
+ 80481aa:	00 00                	add    %al,(%eax)
+ 80481ac:	0b 00                	or     (%eax),%eax
+ 80481ae:	00 00                	add    %al,(%eax)
+ 80481b0:	6c                   	insb   (%dx),%es:(%edi)
+ 80481b1:	84 04 08             	test   %al,(%eax,%ecx,1)
+ 80481b4:	04 00                	add    $0x0,%al
+ 80481b6:	00 00                	add    %al,(%eax)
+ 80481b8:	11 00                	adc    %eax,(%eax)
+ 80481ba:	0f 00 1a             	ltr    (%edx)
+	...
+ 80481c5:	00 00                	add    %al,(%eax)
+ 80481c7:	00 12                	add    %dl,(%edx)
+ 80481c9:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .dynstr:
+
+080481cc <.dynstr>:
+ 80481cc:	00 6c 69 62          	add    %ch,0x62(%ecx,%ebp,2)
+ 80481d0:	63 2e                	arpl   %bp,(%esi)
+ 80481d2:	73 6f                	jae    8048243 <len+0x8048226>
+ 80481d4:	2e 36 00 5f 49       	cs add %bl,%ss:0x49(%edi)
+ 80481d9:	4f                   	dec    %edi
+ 80481da:	5f                   	pop    %edi
+ 80481db:	73 74                	jae    8048251 <_init+0x5>
+ 80481dd:	64 69 6e 5f 75 73 65 	imul   $0x64657375,%fs:0x5f(%esi),%ebp
+ 80481e4:	64 
+ 80481e5:	00 5f 5f             	add    %bl,0x5f(%edi)
+ 80481e8:	6c                   	insb   (%dx),%es:(%edi)
+ 80481e9:	69 62 63 5f 73 74 61 	imul   $0x6174735f,0x63(%edx),%esp
+ 80481f0:	72 74                	jb     8048266 <_init+0x1a>
+ 80481f2:	5f                   	pop    %edi
+ 80481f3:	6d                   	insl   (%dx),%es:(%edi)
+ 80481f4:	61                   	popa   
+ 80481f5:	69 6e 00 5f 5f 67 6d 	imul   $0x6d675f5f,0x0(%esi),%ebp
+ 80481fc:	6f                   	outsl  %ds:(%esi),(%dx)
+ 80481fd:	6e                   	outsb  %ds:(%esi),(%dx)
+ 80481fe:	5f                   	pop    %edi
+ 80481ff:	73 74                	jae    8048275 <_init+0x29>
+ 8048201:	61                   	popa   
+ 8048202:	72 74                	jb     8048278 <_init+0x2c>
+ 8048204:	5f                   	pop    %edi
+ 8048205:	5f                   	pop    %edi
+ 8048206:	00 47 4c             	add    %al,0x4c(%edi)
+ 8048209:	49                   	dec    %ecx
+ 804820a:	42                   	inc    %edx
+ 804820b:	43                   	inc    %ebx
+ 804820c:	5f                   	pop    %edi
+ 804820d:	32 2e                	xor    (%esi),%ch
+ 804820f:	30 00                	xor    %al,(%eax)
+
+Disassembly of section .gnu.version:
+
+08048212 <.gnu.version>:
+ 8048212:	00 00                	add    %al,(%eax)
+ 8048214:	00 00                	add    %al,(%eax)
+ 8048216:	01 00                	add    %eax,(%eax)
+ 8048218:	02 00                	add    (%eax),%al
+
+Disassembly of section .gnu.version_r:
+
+0804821c <.gnu.version_r>:
+ 804821c:	01 00                	add    %eax,(%eax)
+ 804821e:	01 00                	add    %eax,(%eax)
+ 8048220:	01 00                	add    %eax,(%eax)
+ 8048222:	00 00                	add    %al,(%eax)
+ 8048224:	10 00                	adc    %al,(%eax)
+ 8048226:	00 00                	add    %al,(%eax)
+ 8048228:	00 00                	add    %al,(%eax)
+ 804822a:	00 00                	add    %al,(%eax)
+ 804822c:	10 69 69             	adc    %ch,0x69(%ecx)
+ 804822f:	0d 00 00 02 00       	or     $0x20000,%eax
+ 8048234:	3b 00                	cmp    (%eax),%eax
+ 8048236:	00 00                	add    %al,(%eax)
+ 8048238:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .rel.dyn:
+
+0804823c <.rel.dyn>:
+ 804823c:	28 96 04 08 06 01    	sub    %dl,0x1060804(%esi)
+	...
+
+Disassembly of section .rel.plt:
+
+08048244 <.rel.plt>:
+ 8048244:	38 96 04 08 07 03    	cmp    %dl,0x3070804(%esi)
+	...
+
+Disassembly of section .init:
+
+0804824c <_init>:
+ 804824c:	53                   	push   %ebx
+ 804824d:	83 ec 08             	sub    $0x8,%esp
+ 8048250:	e8 7b 00 00 00       	call   80482d0 <__x86.get_pc_thunk.bx>
+ 8048255:	81 c3 d7 13 00 00    	add    $0x13d7,%ebx
+ 804825b:	8b 83 fc ff ff ff    	mov    -0x4(%ebx),%eax
+ 8048261:	85 c0                	test   %eax,%eax
+ 8048263:	74 05                	je     804826a <_init+0x1e>
+ 8048265:	e8 26 00 00 00       	call   8048290 <__libc_start_main@plt+0x10>
+ 804826a:	83 c4 08             	add    $0x8,%esp
+ 804826d:	5b                   	pop    %ebx
+ 804826e:	c3                   	ret    
+
+Disassembly of section .plt:
+
+08048270 <__libc_start_main@plt-0x10>:
+ 8048270:	ff 35 30 96 04 08    	pushl  0x8049630
+ 8048276:	ff 25 34 96 04 08    	jmp    *0x8049634
+ 804827c:	00 00                	add    %al,(%eax)
+	...
+
+08048280 <__libc_start_main@plt>:
+ 8048280:	ff 25 38 96 04 08    	jmp    *0x8049638
+ 8048286:	68 00 00 00 00       	push   $0x0
+ 804828b:	e9 e0 ff ff ff       	jmp    8048270 <_init+0x24>
+
+Disassembly of section .plt.got:
+
+08048290 <.plt.got>:
+ 8048290:	ff 25 28 96 04 08    	jmp    *0x8049628
+ 8048296:	66 90                	xchg   %ax,%ax
+
+Disassembly of section .text:
+
+080482a0 <_start>:
+ 80482a0:	31 ed                	xor    %ebp,%ebp
+ 80482a2:	5e                   	pop    %esi
+ 80482a3:	89 e1                	mov    %esp,%ecx
+ 80482a5:	83 e4 f0             	and    $0xfffffff0,%esp
+ 80482a8:	50                   	push   %eax
+ 80482a9:	54                   	push   %esp
+ 80482aa:	52                   	push   %edx
+ 80482ab:	68 50 84 04 08       	push   $0x8048450
+ 80482b0:	68 f0 83 04 08       	push   $0x80483f0
+ 80482b5:	51                   	push   %ecx
+ 80482b6:	56                   	push   %esi
+ 80482b7:	68 d6 83 04 08       	push   $0x80483d6
+ 80482bc:	e8 bf ff ff ff       	call   8048280 <__libc_start_main@plt>
+ 80482c1:	f4                   	hlt    
+ 80482c2:	66 90                	xchg   %ax,%ax
+ 80482c4:	66 90                	xchg   %ax,%ax
+ 80482c6:	66 90                	xchg   %ax,%ax
+ 80482c8:	66 90                	xchg   %ax,%ax
+ 80482ca:	66 90                	xchg   %ax,%ax
+ 80482cc:	66 90                	xchg   %ax,%ax
+ 80482ce:	66 90                	xchg   %ax,%ax
+
+080482d0 <__x86.get_pc_thunk.bx>:
+ 80482d0:	8b 1c 24             	mov    (%esp),%ebx
+ 80482d3:	c3                   	ret    
+ 80482d4:	66 90                	xchg   %ax,%ax
+ 80482d6:	66 90                	xchg   %ax,%ax
+ 80482d8:	66 90                	xchg   %ax,%ax
+ 80482da:	66 90                	xchg   %ax,%ax
+ 80482dc:	66 90                	xchg   %ax,%ax
+ 80482de:	66 90                	xchg   %ax,%ax
+
+080482e0 <deregister_tm_clones>:
+ 80482e0:	b8 67 96 04 08       	mov    $0x8049667,%eax
+ 80482e5:	2d 64 96 04 08       	sub    $0x8049664,%eax
+ 80482ea:	83 f8 06             	cmp    $0x6,%eax
+ 80482ed:	76 1a                	jbe    8048309 <deregister_tm_clones+0x29>
+ 80482ef:	b8 00 00 00 00       	mov    $0x0,%eax
+ 80482f4:	85 c0                	test   %eax,%eax
+ 80482f6:	74 11                	je     8048309 <deregister_tm_clones+0x29>
+ 80482f8:	55                   	push   %ebp
+ 80482f9:	89 e5                	mov    %esp,%ebp
+ 80482fb:	83 ec 14             	sub    $0x14,%esp
+ 80482fe:	68 64 96 04 08       	push   $0x8049664
+ 8048303:	ff d0                	call   *%eax
+ 8048305:	83 c4 10             	add    $0x10,%esp
+ 8048308:	c9                   	leave  
+ 8048309:	f3 c3                	repz ret 
+ 804830b:	90                   	nop
+ 804830c:	8d 74 26 00          	lea    0x0(%esi,%eiz,1),%esi
+
+08048310 <register_tm_clones>:
+ 8048310:	b8 64 96 04 08       	mov    $0x8049664,%eax
+ 8048315:	2d 64 96 04 08       	sub    $0x8049664,%eax
+ 804831a:	c1 f8 02             	sar    $0x2,%eax
+ 804831d:	89 c2                	mov    %eax,%edx
+ 804831f:	c1 ea 1f             	shr    $0x1f,%edx
+ 8048322:	01 d0                	add    %edx,%eax
+ 8048324:	d1 f8                	sar    %eax
+ 8048326:	74 1b                	je     8048343 <register_tm_clones+0x33>
+ 8048328:	ba 00 00 00 00       	mov    $0x0,%edx
+ 804832d:	85 d2                	test   %edx,%edx
+ 804832f:	74 12                	je     8048343 <register_tm_clones+0x33>
+ 8048331:	55                   	push   %ebp
+ 8048332:	89 e5                	mov    %esp,%ebp
+ 8048334:	83 ec 10             	sub    $0x10,%esp
+ 8048337:	50                   	push   %eax
+ 8048338:	68 64 96 04 08       	push   $0x8049664
+ 804833d:	ff d2                	call   *%edx
+ 804833f:	83 c4 10             	add    $0x10,%esp
+ 8048342:	c9                   	leave  
+ 8048343:	f3 c3                	repz ret 
+ 8048345:	8d 74 26 00          	lea    0x0(%esi,%eiz,1),%esi
+ 8048349:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi
+
+08048350 <__do_global_dtors_aux>:
+ 8048350:	80 3d 61 96 04 08 00 	cmpb   $0x0,0x8049661
+ 8048357:	75 13                	jne    804836c <__do_global_dtors_aux+0x1c>
+ 8048359:	55                   	push   %ebp
+ 804835a:	89 e5                	mov    %esp,%ebp
+ 804835c:	83 ec 08             	sub    $0x8,%esp
+ 804835f:	e8 7c ff ff ff       	call   80482e0 <deregister_tm_clones>
+ 8048364:	c6 05 61 96 04 08 01 	movb   $0x1,0x8049661
+ 804836b:	c9                   	leave  
+ 804836c:	f3 c3                	repz ret 
+ 804836e:	66 90                	xchg   %ax,%ax
+
+08048370 <frame_dummy>:
+ 8048370:	b8 3c 95 04 08       	mov    $0x804953c,%eax
+ 8048375:	8b 10                	mov    (%eax),%edx
+ 8048377:	85 d2                	test   %edx,%edx
+ 8048379:	75 05                	jne    8048380 <frame_dummy+0x10>
+ 804837b:	eb 93                	jmp    8048310 <register_tm_clones>
+ 804837d:	8d 76 00             	lea    0x0(%esi),%esi
+ 8048380:	ba 00 00 00 00       	mov    $0x0,%edx
+ 8048385:	85 d2                	test   %edx,%edx
+ 8048387:	74 f2                	je     804837b <frame_dummy+0xb>
+ 8048389:	55                   	push   %ebp
+ 804838a:	89 e5                	mov    %esp,%ebp
+ 804838c:	83 ec 14             	sub    $0x14,%esp
+ 804838f:	50                   	push   %eax
+ 8048390:	ff d2                	call   *%edx
+ 8048392:	83 c4 10             	add    $0x10,%esp
+ 8048395:	c9                   	leave  
+ 8048396:	e9 75 ff ff ff       	jmp    8048310 <register_tm_clones>
+ 804839b:	66 90                	xchg   %ax,%ax
+ 804839d:	66 90                	xchg   %ax,%ax
+ 804839f:	90                   	nop
+
+080483a0 <myfunc1>:
+ 80483a0:	b8 04 00 00 00       	mov    $0x4,%eax
+ 80483a5:	bb 01 00 00 00       	mov    $0x1,%ebx
+ 80483aa:	b9 44 96 04 08       	mov    $0x8049644,%ecx
+ 80483af:	ba 1d 00 00 00       	mov    $0x1d,%edx
+ 80483b4:	cd 80                	int    $0x80
+ 80483b6:	83 c4 04             	add    $0x4,%esp
+ 80483b9:	e8 00 00 00 00       	call   80483be <myexit>
+
+080483be <myexit>:
+ 80483be:	b8 01 00 00 00       	mov    $0x1,%eax
+ 80483c3:	bb 03 00 00 00       	mov    $0x3,%ebx
+ 80483c8:	81 44 24 04 80 00 00 	addl   $0x80,0x4(%esp)
+ 80483cf:	00 
+ 80483d0:	8b 5c 24 04          	mov    0x4(%esp),%ebx
+ 80483d4:	cd 80                	int    $0x80
+
+080483d6 <main>:
+ 80483d6:	8d 1d 3b 49 81 01    	lea    0x181493b,%ebx
+ 80483dc:	8d 05 10 00 00 00    	lea    0x10,%eax
+ 80483e2:	f7 e3                	mul    %ebx
+ 80483e4:	35 10 10 10 10       	xor    $0x10101010,%eax
+ 80483e9:	ff e0                	jmp    *%eax
+ 80483eb:	66 90                	xchg   %ax,%ax
+ 80483ed:	66 90                	xchg   %ax,%ax
+ 80483ef:	90                   	nop
+
+080483f0 <__libc_csu_init>:
+ 80483f0:	55                   	push   %ebp
+ 80483f1:	57                   	push   %edi
+ 80483f2:	56                   	push   %esi
+ 80483f3:	53                   	push   %ebx
+ 80483f4:	e8 d7 fe ff ff       	call   80482d0 <__x86.get_pc_thunk.bx>
+ 80483f9:	81 c3 33 12 00 00    	add    $0x1233,%ebx
+ 80483ff:	83 ec 0c             	sub    $0xc,%esp
+ 8048402:	8b 6c 24 20          	mov    0x20(%esp),%ebp
+ 8048406:	8d b3 0c ff ff ff    	lea    -0xf4(%ebx),%esi
+ 804840c:	e8 3b fe ff ff       	call   804824c <_init>
+ 8048411:	8d 83 08 ff ff ff    	lea    -0xf8(%ebx),%eax
+ 8048417:	29 c6                	sub    %eax,%esi
+ 8048419:	c1 fe 02             	sar    $0x2,%esi
+ 804841c:	85 f6                	test   %esi,%esi
+ 804841e:	74 25                	je     8048445 <__libc_csu_init+0x55>
+ 8048420:	31 ff                	xor    %edi,%edi
+ 8048422:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
+ 8048428:	83 ec 04             	sub    $0x4,%esp
+ 804842b:	ff 74 24 2c          	pushl  0x2c(%esp)
+ 804842f:	ff 74 24 2c          	pushl  0x2c(%esp)
+ 8048433:	55                   	push   %ebp
+ 8048434:	ff 94 bb 08 ff ff ff 	call   *-0xf8(%ebx,%edi,4)
+ 804843b:	83 c7 01             	add    $0x1,%edi
+ 804843e:	83 c4 10             	add    $0x10,%esp
+ 8048441:	39 f7                	cmp    %esi,%edi
+ 8048443:	75 e3                	jne    8048428 <__libc_csu_init+0x38>
+ 8048445:	83 c4 0c             	add    $0xc,%esp
+ 8048448:	5b                   	pop    %ebx
+ 8048449:	5e                   	pop    %esi
+ 804844a:	5f                   	pop    %edi
+ 804844b:	5d                   	pop    %ebp
+ 804844c:	c3                   	ret    
+ 804844d:	8d 76 00             	lea    0x0(%esi),%esi
+
+08048450 <__libc_csu_fini>:
+ 8048450:	f3 c3                	repz ret 
+
+Disassembly of section .fini:
+
+08048454 <_fini>:
+ 8048454:	53                   	push   %ebx
+ 8048455:	83 ec 08             	sub    $0x8,%esp
+ 8048458:	e8 73 fe ff ff       	call   80482d0 <__x86.get_pc_thunk.bx>
+ 804845d:	81 c3 cf 11 00 00    	add    $0x11cf,%ebx
+ 8048463:	83 c4 08             	add    $0x8,%esp
+ 8048466:	5b                   	pop    %ebx
+ 8048467:	c3                   	ret    
+
+Disassembly of section .rodata:
+
+08048468 <_fp_hw>:
+ 8048468:	03 00                	add    (%eax),%eax
+	...
+
+0804846c <_IO_stdin_used>:
+ 804846c:	01 00                	add    %eax,(%eax)
+ 804846e:	02 00                	add    (%eax),%al
+
+Disassembly of section .eh_frame_hdr:
+
+08048470 <__GNU_EH_FRAME_HDR>:
+ 8048470:	01 1b                	add    %ebx,(%ebx)
+ 8048472:	03 3b                	add    (%ebx),%edi
+ 8048474:	20 00                	and    %al,(%eax)
+ 8048476:	00 00                	add    %al,(%eax)
+ 8048478:	03 00                	add    (%eax),%eax
+ 804847a:	00 00                	add    %al,(%eax)
+ 804847c:	00 fe                	add    %bh,%dh
+ 804847e:	ff                   	(bad)  
+ 804847f:	ff                   	(bad)  
+ 8048480:	3c 00                	cmp    $0x0,%al
+ 8048482:	00 00                	add    %al,(%eax)
+ 8048484:	80 ff ff             	cmp    $0xff,%bh
+ 8048487:	ff 60 00             	jmp    *0x0(%eax)
+ 804848a:	00 00                	add    %al,(%eax)
+ 804848c:	e0 ff                	loopne 804848d <__GNU_EH_FRAME_HDR+0x1d>
+ 804848e:	ff                   	(bad)  
+ 804848f:	ff                   	.byte 0xff
+ 8048490:	ac                   	lods   %ds:(%esi),%al
+ 8048491:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .eh_frame:
+
+08048494 <__FRAME_END__-0x9c>:
+ 8048494:	14 00                	adc    $0x0,%al
+ 8048496:	00 00                	add    %al,(%eax)
+ 8048498:	00 00                	add    %al,(%eax)
+ 804849a:	00 00                	add    %al,(%eax)
+ 804849c:	01 7a 52             	add    %edi,0x52(%edx)
+ 804849f:	00 01                	add    %al,(%ecx)
+ 80484a1:	7c 08                	jl     80484ab <__GNU_EH_FRAME_HDR+0x3b>
+ 80484a3:	01 1b                	add    %ebx,(%ebx)
+ 80484a5:	0c 04                	or     $0x4,%al
+ 80484a7:	04 88                	add    $0x88,%al
+ 80484a9:	01 00                	add    %eax,(%eax)
+ 80484ab:	00 20                	add    %ah,(%eax)
+ 80484ad:	00 00                	add    %al,(%eax)
+ 80484af:	00 1c 00             	add    %bl,(%eax,%eax,1)
+ 80484b2:	00 00                	add    %al,(%eax)
+ 80484b4:	bc fd ff ff 20       	mov    $0x20fffffd,%esp
+ 80484b9:	00 00                	add    %al,(%eax)
+ 80484bb:	00 00                	add    %al,(%eax)
+ 80484bd:	0e                   	push   %cs
+ 80484be:	08 46 0e             	or     %al,0xe(%esi)
+ 80484c1:	0c 4a                	or     $0x4a,%al
+ 80484c3:	0f 0b                	ud2    
+ 80484c5:	74 04                	je     80484cb <__GNU_EH_FRAME_HDR+0x5b>
+ 80484c7:	78 00                	js     80484c9 <__GNU_EH_FRAME_HDR+0x59>
+ 80484c9:	3f                   	aas    
+ 80484ca:	1a 3b                	sbb    (%ebx),%bh
+ 80484cc:	2a 32                	sub    (%edx),%dh
+ 80484ce:	24 22                	and    $0x22,%al
+ 80484d0:	48                   	dec    %eax
+ 80484d1:	00 00                	add    %al,(%eax)
+ 80484d3:	00 40 00             	add    %al,0x0(%eax)
+ 80484d6:	00 00                	add    %al,(%eax)
+ 80484d8:	18 ff                	sbb    %bh,%bh
+ 80484da:	ff                   	(bad)  
+ 80484db:	ff 5d 00             	lcall  *0x0(%ebp)
+ 80484de:	00 00                	add    %al,(%eax)
+ 80484e0:	00 41 0e             	add    %al,0xe(%ecx)
+ 80484e3:	08 85 02 41 0e 0c    	or     %al,0xc0e4102(%ebp)
+ 80484e9:	87 03                	xchg   %eax,(%ebx)
+ 80484eb:	41                   	inc    %ecx
+ 80484ec:	0e                   	push   %cs
+ 80484ed:	10 86 04 41 0e 14    	adc    %al,0x140e4104(%esi)
+ 80484f3:	83 05 4e 0e 20 69 0e 	addl   $0xe,0x69200e4e
+ 80484fa:	24 44                	and    $0x44,%al
+ 80484fc:	0e                   	push   %cs
+ 80484fd:	28 44 0e 2c          	sub    %al,0x2c(%esi,%ecx,1)
+ 8048501:	41                   	inc    %ecx
+ 8048502:	0e                   	push   %cs
+ 8048503:	30 4d 0e             	xor    %cl,0xe(%ebp)
+ 8048506:	20 47 0e             	and    %al,0xe(%edi)
+ 8048509:	14 41                	adc    $0x41,%al
+ 804850b:	c3                   	ret    
+ 804850c:	0e                   	push   %cs
+ 804850d:	10 41 c6             	adc    %al,-0x3a(%ecx)
+ 8048510:	0e                   	push   %cs
+ 8048511:	0c 41                	or     $0x41,%al
+ 8048513:	c7                   	(bad)  
+ 8048514:	0e                   	push   %cs
+ 8048515:	08 41 c5             	or     %al,-0x3b(%ecx)
+ 8048518:	0e                   	push   %cs
+ 8048519:	04 00                	add    $0x0,%al
+ 804851b:	00 10                	add    %dl,(%eax)
+ 804851d:	00 00                	add    %al,(%eax)
+ 804851f:	00 8c 00 00 00 2c ff 	add    %cl,-0xd40000(%eax,%eax,1)
+ 8048526:	ff                   	(bad)  
+ 8048527:	ff 02                	incl   (%edx)
+ 8048529:	00 00                	add    %al,(%eax)
+ 804852b:	00 00                	add    %al,(%eax)
+ 804852d:	00 00                	add    %al,(%eax)
+	...
+
+08048530 <__FRAME_END__>:
+ 8048530:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .init_array:
+
+08049534 <__frame_dummy_init_array_entry>:
+ 8049534:	70 83                	jo     80494b9 <__FRAME_END__+0xf89>
+ 8049536:	04 08                	add    $0x8,%al
+
+Disassembly of section .fini_array:
+
+08049538 <__do_global_dtors_aux_fini_array_entry>:
+ 8049538:	50                   	push   %eax
+ 8049539:	83                   	.byte 0x83
+ 804953a:	04 08                	add    $0x8,%al
+
+Disassembly of section .jcr:
+
+0804953c <__JCR_END__>:
+ 804953c:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .dynamic:
+
+08049540 <_DYNAMIC>:
+ 8049540:	01 00                	add    %eax,(%eax)
+ 8049542:	00 00                	add    %al,(%eax)
+ 8049544:	01 00                	add    %eax,(%eax)
+ 8049546:	00 00                	add    %al,(%eax)
+ 8049548:	0c 00                	or     $0x0,%al
+ 804954a:	00 00                	add    %al,(%eax)
+ 804954c:	4c                   	dec    %esp
+ 804954d:	82                   	(bad)  
+ 804954e:	04 08                	add    $0x8,%al
+ 8049550:	0d 00 00 00 54       	or     $0x54000000,%eax
+ 8049555:	84 04 08             	test   %al,(%eax,%ecx,1)
+ 8049558:	19 00                	sbb    %eax,(%eax)
+ 804955a:	00 00                	add    %al,(%eax)
+ 804955c:	34 95                	xor    $0x95,%al
+ 804955e:	04 08                	add    $0x8,%al
+ 8049560:	1b 00                	sbb    (%eax),%eax
+ 8049562:	00 00                	add    %al,(%eax)
+ 8049564:	04 00                	add    $0x0,%al
+ 8049566:	00 00                	add    %al,(%eax)
+ 8049568:	1a 00                	sbb    (%eax),%al
+ 804956a:	00 00                	add    %al,(%eax)
+ 804956c:	38 95 04 08 1c 00    	cmp    %dl,0x1c0804(%ebp)
+ 8049572:	00 00                	add    %al,(%eax)
+ 8049574:	04 00                	add    $0x0,%al
+ 8049576:	00 00                	add    %al,(%eax)
+ 8049578:	04 00                	add    $0x0,%al
+ 804957a:	00 00                	add    %al,(%eax)
+ 804957c:	68 81 04 08 05       	push   $0x5080481
+ 8049581:	00 00                	add    %al,(%eax)
+ 8049583:	00 cc                	add    %cl,%ah
+ 8049585:	81 04 08 06 00 00 00 	addl   $0x6,(%eax,%ecx,1)
+ 804958c:	8c 81 04 08 0a 00    	mov    %es,0xa0804(%ecx)
+ 8049592:	00 00                	add    %al,(%eax)
+ 8049594:	45                   	inc    %ebp
+ 8049595:	00 00                	add    %al,(%eax)
+ 8049597:	00 0b                	add    %cl,(%ebx)
+ 8049599:	00 00                	add    %al,(%eax)
+ 804959b:	00 10                	add    %dl,(%eax)
+ 804959d:	00 00                	add    %al,(%eax)
+ 804959f:	00 15 00 00 00 00    	add    %dl,0x0
+ 80495a5:	00 00                	add    %al,(%eax)
+ 80495a7:	00 03                	add    %al,(%ebx)
+ 80495a9:	00 00                	add    %al,(%eax)
+ 80495ab:	00 2c 96             	add    %ch,(%esi,%edx,4)
+ 80495ae:	04 08                	add    $0x8,%al
+ 80495b0:	02 00                	add    (%eax),%al
+ 80495b2:	00 00                	add    %al,(%eax)
+ 80495b4:	08 00                	or     %al,(%eax)
+ 80495b6:	00 00                	add    %al,(%eax)
+ 80495b8:	14 00                	adc    $0x0,%al
+ 80495ba:	00 00                	add    %al,(%eax)
+ 80495bc:	11 00                	adc    %eax,(%eax)
+ 80495be:	00 00                	add    %al,(%eax)
+ 80495c0:	17                   	pop    %ss
+ 80495c1:	00 00                	add    %al,(%eax)
+ 80495c3:	00 44 82 04          	add    %al,0x4(%edx,%eax,4)
+ 80495c7:	08 11                	or     %dl,(%ecx)
+ 80495c9:	00 00                	add    %al,(%eax)
+ 80495cb:	00 3c 82             	add    %bh,(%edx,%eax,4)
+ 80495ce:	04 08                	add    $0x8,%al
+ 80495d0:	12 00                	adc    (%eax),%al
+ 80495d2:	00 00                	add    %al,(%eax)
+ 80495d4:	08 00                	or     %al,(%eax)
+ 80495d6:	00 00                	add    %al,(%eax)
+ 80495d8:	13 00                	adc    (%eax),%eax
+ 80495da:	00 00                	add    %al,(%eax)
+ 80495dc:	08 00                	or     %al,(%eax)
+ 80495de:	00 00                	add    %al,(%eax)
+ 80495e0:	fe                   	(bad)  
+ 80495e1:	ff                   	(bad)  
+ 80495e2:	ff 6f 1c             	ljmp   *0x1c(%edi)
+ 80495e5:	82                   	(bad)  
+ 80495e6:	04 08                	add    $0x8,%al
+ 80495e8:	ff                   	(bad)  
+ 80495e9:	ff                   	(bad)  
+ 80495ea:	ff 6f 01             	ljmp   *0x1(%edi)
+ 80495ed:	00 00                	add    %al,(%eax)
+ 80495ef:	00 f0                	add    %dh,%al
+ 80495f1:	ff                   	(bad)  
+ 80495f2:	ff 6f 12             	ljmp   *0x12(%edi)
+ 80495f5:	82                   	(bad)  
+ 80495f6:	04 08                	add    $0x8,%al
+	...
+
+Disassembly of section .got:
+
+08049628 <.got>:
+ 8049628:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .got.plt:
+
+0804962c <_GLOBAL_OFFSET_TABLE_>:
+ 804962c:	40                   	inc    %eax
+ 804962d:	95                   	xchg   %eax,%ebp
+ 804962e:	04 08                	add    $0x8,%al
+	...
+ 8049638:	86                   	.byte 0x86
+ 8049639:	82                   	(bad)  
+ 804963a:	04 08                	add    $0x8,%al
+
+Disassembly of section .data:
+
+0804963c <__data_start>:
+ 804963c:	00 00                	add    %al,(%eax)
+	...
+
+08049640 <__dso_handle>:
+ 8049640:	00 00                	add    %al,(%eax)
+	...
+
+08049644 <mystr>:
+ 8049644:	59                   	pop    %ecx
+ 8049645:	6f                   	outsl  %ds:(%esi),(%dx)
+ 8049646:	75 27                	jne    804966f <__TMC_END__+0xb>
+ 8049648:	76 65                	jbe    80496af <__TMC_END__+0x4b>
+ 804964a:	20 6d 61             	and    %ch,0x61(%ebp)
+ 804964d:	6e                   	outsb  %ds:(%esi),(%dx)
+ 804964e:	61                   	popa   
+ 804964f:	67 65 64 20 74 6f    	gs and %dh,%fs:0x6f(%si)
+ 8049655:	20 72 65             	and    %dh,0x65(%edx)
+ 8049658:	66 20 68 65          	data16 and %ch,0x65(%eax)
+ 804965c:	72 65                	jb     80496c3 <__TMC_END__+0x5f>
+ 804965e:	21 0a                	and    %ecx,(%edx)
+	...
+
+Disassembly of section .bss:
+
+08049661 <__bss_start>:
+ 8049661:	00 00                	add    %al,(%eax)
+	...
+
+Disassembly of section .comment:
+
+00000000 <.comment>:
+   0:	47                   	inc    %edi
+   1:	43                   	inc    %ebx
+   2:	43                   	inc    %ebx
+   3:	3a 20                	cmp    (%eax),%ah
+   5:	28 47 4e             	sub    %al,0x4e(%edi)
+   8:	55                   	push   %ebp
+   9:	29 20                	sub    %esp,(%eax)
+   b:	35 2e 35 2e 30       	xor    $0x302e352e,%eax
+	...

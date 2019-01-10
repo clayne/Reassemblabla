@@ -35,7 +35,6 @@ if __name__=="__main__":
 	parser.add_option("-s", "--shrinksize", dest="shrinksize", help="shrink output binary size by disignate local symbol", action="store_true")
 	parser.set_defaults(verbose=True)
 	(options, args) = parser.parse_args()
-
 	print ""
 	print ""
 	

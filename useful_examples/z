@@ -1,5 +1,0 @@
- as -v --32 -o ex.o ex.s
-
-
-
- /usr/local/libexec/gcc/i686-pc-linux-gnu/5.5.0/collect2 -plugin /usr/local/libexec/gcc/i686-pc-linux-gnu/5.5.0/liblto_plugin.so -plugin-opt=/usr/local/libexec/gcc/i686-pc-linux-gnu/5.5.0/lto-wrapper -plugin-opt=-fresolution=ex.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --eh-frame-hdr -m elf_i386 -dynamic-linker /lib/ld-linux.so.2 -pie -o ex_pie_fpie /usr/lib/i386-linux-gnu/Scrt1.o /usr/lib/i386-linux-gnu/crti.o /usr/local/lib/gcc/i686-pc-linux-gnu/5.5.0/crtbeginS.o -L/usr/local/lib/gcc/i686-pc-linux-gnu/5.5.0 -L/usr/local/lib/gcc/i686-pc-linux-gnu/5.5.0/../../.. -L/lib/i386-linux-gnu -L/usr/lib/i386-linux-gnu ex.o -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/local/lib/gcc/i686-pc-linux-gnu/5.5.0/crtendS.o /usr/lib/i386-linux-gnu/crtn.o
