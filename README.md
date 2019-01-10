@@ -38,5 +38,5 @@
 <br>  
 
 ## 재조립 바이너리 만들기 
-    $ mytest_compile.sh
+    $ ./mytest_compile.sh
 위 과정에서 생성된 컴파일 스크립트를 실행하면 New binary가 컴파일됩니다. 
