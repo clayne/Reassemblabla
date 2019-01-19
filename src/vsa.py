@@ -34,7 +34,7 @@ def backward_slice(resdic, SectionName, ADDR): # resdic[SectionName][ADDR] 를 �
 	이런게 있기때문임...
 '''
 
-# URGENT: 내가 하고자하는게 : 해당라인에있는 hex값이 memory reference라면 true리턴, 아니라면 false리턴. 
+# TODO: 내가 하고자하는게 : 해당라인에있는 hex값이 memory reference라면 true리턴, 아니라면 false리턴. 
 #         그러면 아래 date사태는 어케해결하냐? 
 #         "무에서유창조" 인스트럭션들(아무것도없는 황무지상태의 reg에 한방울 단비를 내리는 인스트럭션) ex) lea, mov, xor eax,eax 등등
 #         ㄴ 이것도 잠자는 에뮬레이션모듈의 코털을 건드리도록 하자. 

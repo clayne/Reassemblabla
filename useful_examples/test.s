@@ -1,26 +1,15 @@
-# gcc -o test test.s -Wl,-z,relro,-z,now
-
 .global main
 
-
-
-
-.section .text 
 main:
-    .lcomm MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_,4
-    call get_pc_thunk.bx
-    add $_GLOBAL_OFFSET_TABLE_, %ebx
-    mov %ebx, MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_
-    mov MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %eax
-    cmp MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %ebx
-    je MYSYM_YES
+ call get_pc_thunk.si
+ mov $0x2, %eax
+ mov $0x3, %esi
+ movb $0x12, (%eax)           # type1 2
+ movb $0x12, 0x7(%eax)        # type2 9
+ movb $0x12, 0x7(%eax,%esi,)  # type3 12
+ movb $0x12, 0x7(,%esi,4)     # type4 19
+ movb $0x12, 0x7(%eax,%esi,4) # type5 21
 
-get_pc_thunk.bx:
-    mov (%esp), %ebx
-    ret
-
-MYSYM_YES:
-    nop
-    nop
-    nop
-    nop
+get_pc_thunk.si:
+ mov (%esp), %esi
+ ret 

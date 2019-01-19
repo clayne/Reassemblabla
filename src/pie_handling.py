@@ -141,14 +141,6 @@ def PIE_calculated_addr_symbolize(resdic):
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
 
-									if len(HEX_VALUE) is 0: # 걍 lea (%ebx), %eax 일수도 있자나?
-										ADD_VALUE = 0 
-									elif len(HEX_VALUE) is 1:
-										ADD_VALUE   = HEX_VALUE[0]
-									elif len(HEX_VALUE) is 2:
-										ADD_VALUE   = HEX_VALUE[0]
-										MULTI_VALUE = HEX_VALUE[1]
-
 									alchemist_said = 'yes' # 레지스터들을 하나의 값으로 연금술할수가 있다.  # 만약 레퍼런스에 사용되는 모든 레지스터(ex, -0x3(%ebx) / 0x12(%eax, %ebx, 4) 에서 사용되는 레지스터)가 keep tracking 하는 레지스터라면, 
 									for _r in REGLIST['REFERENCE_REGISTER']:
 										if _r not in reg.keys(): # 메모리 레퍼런스로써 사용된 레지스터가 keep tracking 하는 레지스터라면, 연금술사는 yes라고 말할것이다. 
@@ -156,10 +148,20 @@ def PIE_calculated_addr_symbolize(resdic):
 
 									if alchemist_said is 'yes':
 										# 11111. Destination 값을 설정한다 
-										if len(REGLIST['REFERENCE_REGISTER']) is 1: # 만약에 0x123(%eax) 같이 하나라면
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + ADD_VALUE # DEST OPERAND 를 설정
-										elif len(REGLIST['REFERENCE_REGISTER']) is 2: # 0x123(%eax, %ebx, 0x123)같이 두개라면:
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + (reg[REGLIST['REFERENCE_REGISTER'][1]] * MULTI_VALUE) + ADD_VALUE
+										if   len(HEX_VALUE) is 0 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type1) lea (%ebx), %eax
+											DESTINATION  = reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type2) lea 12(%ebx), %eax
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type3) lea 0(%eax,%ebx,), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type4) lea 0(,%ebx,4), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] * HEX_VALUE[1]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type5) lea 0(%eax,%ebx,4), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]] * HEX_VALUE[1]
 
 										# 22222. 전파되는 레지스터값들을 설정한다(에뮬레이션을 위함). 
 										if DISASM.startswith(' adc'): # R/M32 메모리에들어있는값을 [차원변경] 읽어와서, register의 값에다가 그 읽어온값을 더한다. 그러므로 트래킹 제외. 
@@ -362,14 +364,6 @@ def PIE_calculated_addr_symbolize(resdic):
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
 
-									if len(HEX_VALUE) is 0: # 걍 lea (%ebx), %eax 일수도 있자나?
-										ADD_VALUE = 0 
-									elif len(HEX_VALUE) is 1:
-										ADD_VALUE   = HEX_VALUE[0]
-									elif len(HEX_VALUE) is 2:
-										ADD_VALUE   = HEX_VALUE[0]
-										MULTI_VALUE = HEX_VALUE[1]
-
 									alchemist_said = 'yes' # 레지스터들을 하나의 값으로 연금술할수가 있다.  # 만약 레퍼런스에 사용되는 모든 레지스터(ex, -0x3(%ebx) / 0x12(%eax, %ebx, 4) 에서 사용되는 레지스터)가 keep tracking 하는 레지스터라면, 
 									for _r in REGLIST['REFERENCE_REGISTER']:
 										if _r not in reg.keys(): # 메모리 레퍼런스로써 사용된 레지스터가 keep tracking 하는 레지스터라면, 연금술사는 yes라고 말할것이다. 
@@ -377,10 +371,22 @@ def PIE_calculated_addr_symbolize(resdic):
 									
 									if alchemist_said is 'yes':
 										# 11111. Destination 값을 설정한다 
-										if len(REGLIST['REFERENCE_REGISTER']) is 1: # 만약에 0x123(%eax) 같이 하나라면
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + ADD_VALUE # DEST OPERAND 를 설정
-										elif len(REGLIST['REFERENCE_REGISTER']) is 2: # 0x123(%eax, %ebx, 0x123)같이 두개라면:
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + (reg[REGLIST['REFERENCE_REGISTER'][1]] * MULTI_VALUE) + ADD_VALUE
+										print DISASM
+										if   len(HEX_VALUE) is 0 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type1) lea (%ebx), %eax
+											DESTINATION  = reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type2) lea 12(%ebx), %eax
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type3) lea 0(%eax,%ebx,), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type4) lea 0(,%ebx,4), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] * HEX_VALUE[1]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type5) lea 0(%eax,%ebx,4), %ebx
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]] * HEX_VALUE[1]
+
 
 										# 22222. 전파되는 레지스터값들을 설정한다(에뮬레이션을 위함). 
 										if DISASM.startswith(' adc'): # R/M32 메모리에들어있는값을 [차원변경] 읽어와서, register의 값에다가 그 읽어온값을 더한다. 그러므로 트래킹 제외. 
@@ -657,17 +663,6 @@ def PIE_calculated_addr_symbolize(resdic):
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
 
-									if len(HEX_VALUE) is 1: # 걍 lea (%ebx), %eax 일수도 있자나?
-										IMM_VALUE   = HEX_VALUE[0]	
-										ADD_VALUE = 0 
-									elif len(HEX_VALUE) is 2:
-										IMM_VALUE   = HEX_VALUE[0]
-										ADD_VALUE   = HEX_VALUE[1]
-									elif len(HEX_VALUE) is 3:
-										IMM_VALUE   = HEX_VALUE[0]
-										ADD_VALUE   = HEX_VALUE[1]
-										MULTI_VALUE = HEX_VALUE[2]
-
 									alchemist_said = 'yes' # 레지스터들을 하나의 값으로 연금술할수가 있다.  # 만약 레퍼런스에 사용되는 모든 레지스터(ex, -0x3(%ebx) / 0x12(%eax, %ebx, 4) 에서 사용되는 레지스터)가 keep tracking 하는 레지스터라면, 
 									for _r in REGLIST['REFERENCE_REGISTER']:
 										if _r not in reg.keys(): # 메모리 레퍼런스로써 사용된 레지스터가 keep tracking 하는 레지스터라면, 연금술사는 yes라고 말할것이다. 
@@ -675,10 +670,24 @@ def PIE_calculated_addr_symbolize(resdic):
 
 									if alchemist_said is 'yes':
 										# 11111. Destination 값을 설정한다 
-										if len(REGLIST['REFERENCE_REGISTER']) is 1: # 만약에 0x123(%eax) 같이 하나라면
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + ADD_VALUE # DEST OPERAND 를 설정
-										elif len(REGLIST['REFERENCE_REGISTER']) is 2: # 0x123(%eax, %ebx, 0x123)같이 두개라면:
-											DESTINATION     = reg[REGLIST['REFERENCE_REGISTER'][0]] + (reg[REGLIST['REFERENCE_REGISTER'][1]] * MULTI_VALUE) + ADD_VALUE
+										if   len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type1) mov $0x12, (%eax)
+											DESTINATION  = reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type2) mov $0x12, 12(%ebx)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type3) mov $0x12,  0(%eax,%ebx,)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]]
+
+										elif len(HEX_VALUE) is 3 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type4) mov $0x12, lea 0(,%ebx,4)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] * HEX_VALUE[2]
+
+										elif len(HEX_VALUE) is 3 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type5) mov $0x12,  0(%eax,%ebx,4)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]] * HEX_VALUE[2]
+
+
+
+
 
 										# 22222. 전파되는 레지스터값들을 설정한다(에뮬레이션을 위함). 
 										if DISASM.startswith(' adc'): 
