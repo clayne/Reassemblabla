@@ -3,7 +3,6 @@
 #from __future__ import print_function
 from os import listdir
 from os.path import isfile, join
-import os
 import subprocess
 import sys 
 import os
@@ -13,10 +12,6 @@ from elftools.elf.elffile import ELFFile
 from elftools import *
 from keystone import *
 import pwn
-from binary2dic import *
-from etc import *
-from symbolize import *
-from global_variables import *
 import stat
 
 # python Test2.py ~/coreutils/src/ /home/osboxes/coreutils/src
