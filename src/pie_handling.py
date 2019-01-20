@@ -973,9 +973,13 @@ def PIE_calculated_addr_symbolize(resdic):
 												print "--------------> {}".format(resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j])
 
 
-
+							'TODO:' # 이거 왜 안했지?
 							for pattern in p_PATTERN_04:
-								'TODO:' # 이거 왜 안했지?
+								if hit_pattern == 'HIT':
+									break
+
+
+
 
 
 
