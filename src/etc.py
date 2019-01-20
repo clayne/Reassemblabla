@@ -12,8 +12,16 @@ import binascii
 from global_variables import *
 
 def one_operand_instruction(DISASM):
-	if ',' not in DISASM: return True
-	else: return False 
+	if ',' not in DISASM: return True                   # call %eax
+	else:                                               # call 0x12(%eax, %ebx, 2)
+		if '(' in DISASM and ')' in DISASM:
+			i1 = DISASM.index('(')
+			i2 = DISASM.index(')')
+			DISASM = DISASM.replace(DISASM[i1:i2 + 1],'')
+			if ',' not in DISASM:
+				return True
+	return False                                       # default. ex) mov $0x12, 0x12(%eax, %ebx, 4)
+
 
 def unsigned2signed(integervalue): 
 	if integervalue > 0xffffffff: # 8byte long
