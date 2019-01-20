@@ -12,6 +12,8 @@ import binascii
 from global_variables import *
 
 def one_operand_instruction(DISASM):
+	if '#' in DISASM:                                   # remove comment
+		DISASM = DISASM[:DISASM.index('#')]  
 	if ',' not in DISASM: return True                   # call %eax
 	else:                                               # call 0x12(%eax, %ebx, 2)
 		if '(' in DISASM and ')' in DISASM:
