@@ -992,8 +992,7 @@ def PIE_calculated_addr_symbolize(resdic):
 												print "--------------> {}".format(resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j])
 
 
-							'TODO:' # 이거 왜 안했지?
-							for pattern in p_PATTERN_04:
+							for pattern in p_PATTERN_04: # 인스트럭션 + REGREF // call 0x12(%eax, %ebx, 4)
 								if hit_pattern == 'HIT':
 									break
 
@@ -1003,16 +1002,27 @@ def PIE_calculated_addr_symbolize(resdic):
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
 									found_memory_reference = 0
-									alchemist_said = 'no' 
-									if  REGLIST['ORDINARY_REGISTER'][0] in reg.keys(): 
-										alchemist_said = 'yes'
-									# 음... 저거 레지스터의 결과값을 카운트해줄 필요는 없다. 왜냐하면, 연산결과는 레지스터가 아닌 메모리에 기록되기 때문이다. 
-									# All I have to do is that 
+									alchemist_said = 'yes' 
 
-									# 레지스터값들이 달라지는지 안달라지는지 체크해보자.
+									for _r in REGLIST['REFERENCE_REGISTER']:
+										if _r not in reg.keys(): # 메모리 레퍼런스로써 사용된 레지스터가 keep tracking 하는 레지스터라면, 연금술사는 yes라고 말할것이다. 
+											alchemist_said = 'no'
+
 									if alchemist_said is 'yes':
 										# 11111. Destination 값을 설정한다 
-										DESTINATION = reg[REGLIST['ORDINARY_REGISTER'][0]] 
+										if   len(HEX_VALUE) is 0 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type1) call (%ebx)
+											DESTINATION  = reg[REGLIST['REFERENCE_REGISTER'][0]]
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type2) call 12(%ebx)
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type3) call 0(%eax,%ebx,)
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type4) call 0(,%ebx,4)
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] * HEX_VALUE[1]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type5) call 0(%eax,%ebx,4)
+											DESTINATION  = HEX_VALUE[0] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]] * HEX_VALUE[1]
 
 										# 22222. 인스트럭션결과 레지스터값이 바뀌거나/다른레지스터값들이 셋팅되는경우가 있다면 트래킹해준다. 
 										if DISASM.startswith(' call'):
@@ -1023,12 +1033,20 @@ def PIE_calculated_addr_symbolize(resdic):
 											#01. 전파값 셋팅 
 											#02. suffix 셋팅 
 											'Nothing to do'
-										elif  DISASM.startswith(' div'):# URGENT: EAX = 몫, EDX = 나머지. 레지스터값 달라짐. (아래꺼들도 처리 ㄱㄱ)
+										elif  DISASM.startswith(' div'):# EAX = 몫, EDX = 나머지. 레지스터값 달라짐. 
 											#01. 전파값 셋팅 
+											if 'eax' in reg.keys(): 
+												del reg['eax'] 
+											if 'edx' in reg.keys():
+												del reg['edx'] 
 											#02. suffix 셋팅 
 											'Nothing to do'
 										elif  DISASM.startswith(' idiv'):# EAX = 몫, EDX = 나머지. 레지스터값 달라짐. 
-											#01. 전파값 셋팅 
+											#01. 전파값 셋팅
+											if 'eax' in reg.keys(): 
+												del reg['eax'] 
+											if 'edx' in reg.keys():
+												del reg['edx']  
 											#02. suffix 셋팅 
 											'Nothing to do'
 										elif  DISASM.startswith(' imul'): # EDX:EAX 곱셈결과가 여기에 저장됨. 레지스터값 달라짐.
@@ -1039,7 +1057,7 @@ def PIE_calculated_addr_symbolize(resdic):
 											#01. 전파값 셋팅 
 											#02. suffix 셋팅 
 											'Nothing to do'
-										elif  DISASM.startswith(' jmp'):
+										elif  DISASM.startswith(' j'):
 											#01. 전파값 셋팅 
 											#02. suffix 셋팅 
 											'Nothing to do'
@@ -1080,7 +1098,6 @@ def PIE_calculated_addr_symbolize(resdic):
 											#02. suffix 셋팅 
 											'Nothing to do'
 
-										# URGENT: 이거 위에서 똑같이 베껴온건데, call 0x12(%eax)나라의 문화에맞도록 패치하쟝
 										# 심볼라이즈 
 										print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
 										slice_count += 1
@@ -1095,12 +1112,14 @@ def PIE_calculated_addr_symbolize(resdic):
 													simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
 												found_target = 1
 												break
-										if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
-											NEWDISASM = ' ' + INSTRUCTION + ' ' + '%' + REGLIST['ORDINARY_REGISTER'][0] + ', ' + simbolname # TODO:check it
+										if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, 심볼화해준다.  
+											if DISASM.startswith(' j') or DISASM.startswith(' call'): # branch instruction 에서는 메모리참조를 좀 이상하케 표현해준다. (https://blog.naver.com/eternalklaus/221447661076) 
+												NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + simbolname
+											else:
+												NEWDISASM = ' ' + INSTRUCTION + ' ' + simbolname
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST['REFERENCE_REGISTER'] # TODO: 이거 원래 레지스터 하나라고 가정하고 [3]에다가 'ebx'이르케 하나만 갖다쓴건데... 두개이상이 되면서 소거되는 레지스터가 "리스트"로써 갖다쓰인다. 이거 나중에 이걸이용한 처리에서 리스트를 파싱해서 정보를가져다쓰도록 바꿔야함
 											print "                {}... We momorize [{}]...".format(NEWDISASM, resdic[sectionName_1][SORTED_ADDRESS[i]][3])
-
 
 
 
