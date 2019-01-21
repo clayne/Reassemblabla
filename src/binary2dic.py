@@ -496,6 +496,24 @@ def binarycode2dic(filename, SHTABLE):
 
 
 
+def get_SYM_LIST(filename): # Named symbol의 주소를갖다가 파싱해가지고 리스트로 리턴해줌. 심볼들의 주소가 왜필요하냐면, .data에서 named symbol사이사이 레드존을 추가해줘야하기때문임
+	bin = ELFFile(open(filename,'rb')) 
+	SYM_LIST = []
+	for section in bin.iter_sections():
+		if not isinstance(section, SymbolTableSection):
+			continue
+		else:
+			if section.name == '.dynsym':
+				for symbol in section.iter_symbols():
+					'Dynamic symbol parsing routine is disabled.. Because it is get_SYM_LIST function'
+
+			elif section.name == '.symtab': 
+				for symbol in section.iter_symbols():
+					if symbol.name != '': # 실존하시는 심볼이라면 ㅋㅋ
+						if symbol.entry.st_value not in SYM_LIST:
+							SYM_LIST.append(symbol.entry.st_value)
+	return SYM_LIST
+
 
 
 def get_DYNSYM_LIST(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
@@ -518,7 +536,7 @@ def get_DYNSYM_LIST(filename): # 크오오.. 이렇게하면 알아서 다이나
 						elif symbol.entry.st_info['type'] == 'STT_NOTYPE':
 							DYNSYM_LIST[str(symbol.name)] = 'STT_NOTYPE'
 
-			elif section.name == '.symbol': # 섹션이름이 .symbol 이라면 우리의 고려대상이 아님. 우리의툴은 스트립된바이너리를 대상으로 하므로 ㅎㅎ 
+			elif section.name == 'symtab': # 섹션이름이 .symtab 이라면 우리의 고려대상이 아님. 우리의툴은 스트립된바이너리를 대상으로 하므로 ㅎㅎ 
 				'We do not need .symbol section :)'
 
 	return DYNSYM_LIST
