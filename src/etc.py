@@ -199,13 +199,13 @@ def bitscan(register_value, direction):
 				return 31-idx
 	return -1
 
-def there_is_no_memory_reference(line):
+def there_is_memory_reference(line):
 	if '#' in line:
 		line = line[:line.index('#')]
 	if '(' in line and ')' in line:
-		return False
-	else:
 		return True
+	else:
+		return False
 
 
 def list_insert(position, list1, list2):
@@ -545,18 +545,18 @@ def gen_compilescript(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
+# TODO: 이함수 가독성 똥망... 나중에 언제한번 싹 갈아엎고고치자 
+def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment, SYMTAB):
 
-def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	onlyfilename = filename.split('/')[-1] # filename = "/bin/aa/aaaa" 에서 aaaa 민 추출한다
-
 	saved_filename = LOC + '/' + onlyfilename
-
 	f = open(saved_filename + "_reassemblable.s",'w')
 
 	f.write(".global main\n")
 	f.write(".global _start\n")
 	f.write("XXX:\n") # 더미위치
 	f.write(" ret\n") # 더미위치로의 점프를 위한 더미리턴 
+
 
 	# 이거 이제 필요없음. 왜냐면 main의 시작부분에 다이나믹하게 _GLOBAL_OFFSET_TABLE_ 의 값을 구해올수 있기 때문임. 
 	'''
@@ -573,6 +573,7 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 	for sectionName in resdic.keys():
 		if sectionName in AllSections_WRITE:
 			if sectionName not in DoNotWriteThisSection:
+				# Write Section Name
 				if sectionName in TreatThisSection2TEXT:
 					f.write("\n" + ".section " + ".text" + "\n")
 					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
@@ -581,22 +582,27 @@ def gen_assemblyfile(LOC, resdic, filename, CHECKSEC_INFO, comment):
 					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
 				else:
 					f.write("\n"+".section "+sectionName+"\n")
-	
+				
+				# Section Align
 				if sectionName == '.init_array' or sectionName == '.fini_array':
 					'--> 원래 .init_array, .fini_array는 align되면 안된다. 왜냐하면 저장된 주소레퍼런스값을 순회할때 +4+4... 으로 포인터값을 늘려나가는데, 00000000 패딩이 추가된다면 그곳을 실행하게되기 때문이다. '
 				else:
 					f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
 
-				if comment == 1: 
+				# Draw Disassembly
+				if comment is True: 
 					RANGES = 3 # 3이면 충분할듯. 왜냐면 아래 PIE관련정보는 굳이 없어도되잖아? 그리고 이거추가하면 어셈블도 안됨.
 				else:
 					RANGES = 2
-				for ADDR in sorted(resdic[sectionName].iterkeys()): #정렬
+
+				for ADDR in sorted(resdic[sectionName].iterkeys()): # 정렬
+					if ADDR in SYMTAB:
+						f.write('# '  + sectionName[1:] + ' @ ' + hex(ADDR) + "\n")	
 					for i in xrange(RANGES): 
 						if len(resdic[sectionName][ADDR][i]) > 0: # 그냥 엔터만 아니면 됨 
-							if i == 1:
+							if i == 1: # 출력물:resdic[sectionName][ADDR][1](디스어셈블리) 
 								for j in xrange(len(resdic[sectionName][ADDR][i])):
 									f.write(resdic[sectionName][ADDR][i][j]+"\n")	
-							else:
+							else: #  출력물:resdic[sectionName][ADDR][0](심볼이름), resdic[sectionName][ADDR][2](주석)
 								f.write(resdic[sectionName][ADDR][i]+"\n")
 	f.close()
