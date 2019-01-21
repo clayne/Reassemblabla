@@ -279,7 +279,7 @@ def PIE_calculated_addr_symbolize(resdic):
 								if hit_pattern == 'HIT':
 									break
 
-								if there_is_no_memory_reference(DISASM) is True and pattern.match(DISASM) is not None:
+								if there_is_memory_reference(DISASM) is False and pattern.match(DISASM) is not None:
 									hit_pattern     = 'HIT'
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
@@ -515,7 +515,7 @@ def PIE_calculated_addr_symbolize(resdic):
 								if hit_pattern == 'HIT':
 									break
 
-								if there_is_no_memory_reference(DISASM) is True and pattern.match(DISASM) is not None:
+								if there_is_memory_reference(DISASM) is False and pattern.match(DISASM) is not None:
 									hit_pattern     = 'HIT'
 									REGLIST         = classificate_registers(DISASM)
 									INSTRUCTION 	= DISASM.split(' ')[1]
@@ -822,7 +822,7 @@ def PIE_calculated_addr_symbolize(resdic):
 								if hit_pattern == 'HIT':
 									break
 
-								if there_is_no_memory_reference(DISASM) is True and pattern.match(DISASM) is not None:
+								if there_is_memory_reference(DISASM) is False and pattern.match(DISASM) is not None:
 									hit_pattern     = 'HIT'
 									HEX_VALUE       = extract_hex_addr(DISASM)
 									REGLIST         = classificate_registers(DISASM)
@@ -833,7 +833,26 @@ def PIE_calculated_addr_symbolize(resdic):
 										alchemist_said = 'yes, right'
 
 									if 'yes' in alchemist_said:
-										# 11111. Destination 값을 설정한다 --> nothing to do
+										# 11111. Destination 값을 설정한다 
+										if   len(HEX_VALUE) is 0 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type1) call (%eax)
+											DESTINATION  = reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type2) call 12(%ebx)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]]
+
+										elif len(HEX_VALUE) is 1 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type3) call  0(%eax,%ebx,)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 1: # type4) call lea 0(,%ebx,4)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] * HEX_VALUE[2]
+
+										elif len(HEX_VALUE) is 2 and len(REGLIST['REFERENCE_REGISTER']) is 2: # type5) call  0(%eax,%ebx,4)
+											DESTINATION  = HEX_VALUE[1] + reg[REGLIST['REFERENCE_REGISTER'][0]] + reg[REGLIST['REFERENCE_REGISTER'][1]] * HEX_VALUE[2]
+
+
+
+
+
 										# 22222. 전파되는 레지스터값들을 설정한다(에뮬레이션을 위함). 
 										if DISASM.startswith(' adc'): # (add with carry flag. CF가 설정되어있는 경우 결과값은 1을 더 더해줌.) TODO: 이거 add랑 마치 똑같은거인것처럼 처리했다. 그치만 그러케해주면 안댐. lazy symbolization 으로 처리할 수 있을것 같음. 나중에 핸들링 ㄱㄱ
 											#01. 전파값 셋팅
@@ -978,7 +997,109 @@ def PIE_calculated_addr_symbolize(resdic):
 								if hit_pattern == 'HIT':
 									break
 
+								if one_operand_instruction(DISASM) is True and there_is_memory_reference(DISASM) is True and pattern.match(DISASM) is not None: 
+									hit_pattern     = 'HIT'
+									HEX_VALUE       = extract_hex_addr(DISASM)
+									REGLIST         = classificate_registers(DISASM)
+									INSTRUCTION 	= DISASM.split(' ')[1]
+									found_memory_reference = 0
+									alchemist_said = 'no' 
+									if  REGLIST['ORDINARY_REGISTER'][0] in reg.keys(): 
+										alchemist_said = 'yes'
+									# 음... 저거 레지스터의 결과값을 카운트해줄 필요는 없다. 왜냐하면, 연산결과는 레지스터가 아닌 메모리에 기록되기 때문이다. 
+									# All I have to do is that 
 
+									# 레지스터값들이 달라지는지 안달라지는지 체크해보자.
+									if alchemist_said is 'yes':
+										# 11111. Destination 값을 설정한다 
+										DESTINATION = reg[REGLIST['ORDINARY_REGISTER'][0]] 
+
+										# 22222. 인스트럭션결과 레지스터값이 바뀌거나/다른레지스터값들이 셋팅되는경우가 있다면 트래킹해준다. 
+										if DISASM.startswith(' call'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' dec'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' div'):# URGENT: EAX = 몫, EDX = 나머지. 레지스터값 달라짐. (아래꺼들도 처리 ㄱㄱ)
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' idiv'):# EAX = 몫, EDX = 나머지. 레지스터값 달라짐. 
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' imul'): # EDX:EAX 곱셈결과가 여기에 저장됨. 레지스터값 달라짐.
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' inc'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' jmp'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' mul'): # EDX:EAX 곱셈결과가 여기에 저장됨. 레지스터값 달라짐.
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' neg'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' not'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' pop'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' push'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' sal'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' sar'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' shl'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+										elif  DISASM.startswith(' shr'):
+											#01. 전파값 셋팅 
+											#02. suffix 셋팅 
+											'Nothing to do'
+
+										# URGENT: 이거 위에서 똑같이 베껴온건데, call 0x12(%eax)나라의 문화에맞도록 패치하쟝
+										# 심볼라이즈 
+										print "[{}] {} : {} ---> (DEST:{})".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM,hex(DESTINATION))
+										slice_count += 1
+										found_target = 0
+										for sectionName_2 in resdic.keys():
+											if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
+												if resdic[sectionName_2][DESTINATION][0] == '':
+													simbolname  = SYMPREFIX[0] + 'MYSYM_PIE_' + str(count) 
+													count += 1
+													resdic[sectionName_2][DESTINATION][0] = simbolname + ':'
+												else:
+													simbolname = resdic[sectionName_2][DESTINATION][0][:-1]
+												found_target = 1
+												break
+										if found_target == 1 and sectionName_2 in AllSections_WRITE: # 가상 심볼이 아니라면, lea PIE_MYSYM_01, %eax 으로 바꾼다. 
+											NEWDISASM = ' ' + INSTRUCTION + ' ' + '%' + REGLIST['ORDINARY_REGISTER'][0] + ', ' + simbolname # TODO:check it
+											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+											resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST['REFERENCE_REGISTER'] # TODO: 이거 원래 레지스터 하나라고 가정하고 [3]에다가 'ebx'이르케 하나만 갖다쓴건데... 두개이상이 되면서 소거되는 레지스터가 "리스트"로써 갖다쓰인다. 이거 나중에 이걸이용한 처리에서 리스트를 파싱해서 정보를가져다쓰도록 바꿔야함
+											print "                {}... We momorize [{}]...".format(NEWDISASM, resdic[sectionName_1][SORTED_ADDRESS[i]][3])
 
 
 
@@ -987,7 +1108,7 @@ def PIE_calculated_addr_symbolize(resdic):
 								if hit_pattern == 'HIT':
 									break
 
-								if one_operand_instruction(DISASM) is True and there_is_no_memory_reference(DISASM) is True and pattern.match(DISASM) is not None: # regex알못이라 if로 처리하는 멍청이한마리 추가요 
+								if one_operand_instruction(DISASM) is True and there_is_memory_reference(DISASM) is False and pattern.match(DISASM) is not None: # regex알못이라... 예를들어 shl은 shl %eax, %eax도 가능하고 shl %eax도 가능함. if로 처리하는 멍청이한마리 추가요 
 									hit_pattern     = 'HIT'
 									HEX_VALUE       = extract_hex_addr(DISASM)
 									REGLIST         = classificate_registers(DISASM)
@@ -1012,7 +1133,7 @@ def PIE_calculated_addr_symbolize(resdic):
 											reg[REGLIST['ORDINARY_REGISTER'][0]] = reg[REGLIST['ORDINARY_REGISTER'][0]] - 1
 											#02. suffix 셋팅 
 											'Nothing to do'
-										elif DISASM.startswith(' div'): # EAX / register. EAX = 몫, EDX = 나머지(꼭 사전에 0으로 셋팅된 상태여야 함)
+										elif DISASM.startswith(' div'): # edx + eax / register -----> EAX = 몫, EDX = 나머지
 											#01. 전파값 셋팅 
 											if 'eax' in reg.keys() and 'edx' in reg.keys(): # dividend. (곧 몫이 됨)
 												quotient, remainder = instruction_div(reg['edx'], reg['eax'], reg[REGLIST['ORDINARY_REGISTER'][0]])
