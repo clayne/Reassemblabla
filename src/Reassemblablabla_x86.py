@@ -33,6 +33,8 @@ if __name__=="__main__":
 	parser.add_option("-d", "--datainsert", dest="datainsert", help="insert datas to data section", action="store_true")
 	parser.add_option("-l", "--location", dest="location", help="location to save result files")
 	parser.add_option("-s", "--shrinksize", dest="shrinksize", help="shrink output binary size by disignate local symbol", action="store_true")
+	parser.add_option("", "--usesymboltable", dest="usesymboltable", help="generated comment depending on existing symbol table", action="store_true") # for BiOASAN
+	
 	parser.set_defaults(verbose=True)
 	(options, args) = parser.parse_args()
 	print ""
@@ -234,15 +236,10 @@ if __name__=="__main__":
 	print "[*] Add  -Wl,--section-start=.text=0x09000000 to compile.sh!!"
 	'''
 
-
-
-
-
-	if options.comment is True:
-		gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, 1)
-	else:
-		gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, 0)
-
+	SYMTAB = []
+	if options.usesymboltable is True:
+		SYMTAB = get_SYM_LIST(options.filename)
+	gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, options.comment, SYMTAB)
 
 
 	# 왜냐하면 x64머신에서는 x86바이너리에대해 compile script까지 만들어줄수가 없기때문임
