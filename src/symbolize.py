@@ -36,19 +36,6 @@ def pltsection_sanitize(resdic):
 					# resdic[SectionName][addr][0] = 'XXX:'
 					'nono...'
 
-
-# TODO: 이함수는 레거시적인것. 이제 안씀. 없애자. 
-def global_symbolize_000section(dics_of_000, symtab_000):
-	for i in range(0, len(symtab_000.keys())):
-		if symtab_000.keys()[i] in dics_of_000.keys(): # bss에 키가없는데 없는키를 가져다가 심볼라이즈할라니깐 오류남. objdump -T 에서 보면 bss 영역을 벗어난 키가있음 -> 왜있는지 모르겠지만 bss의 __bss_start와 data섹션의 edata가 같은메모리주소를 가짐. 예외처리 ㄱㄱ
-			#  _init, _fini 는 crti.o 에 이미 정의되어있다고하면서 링커에러남. 어차피  원래있던 _init은 안쓸거기도하고. 심볼이름이 그닥중요하진않으니까 심볼이름바꿔서 심볼라이즈 ㄱㄱ
-			if symtab_000.values()[i] == '_init' or symtab_000.values()[i] == '_fini':
-				dics_of_000[symtab_000.keys()[i]][0] = 'MY_' + symtab_000.values()[i]+":"
-			else:
-				dics_of_000[symtab_000.keys()[i]][0] = symtab_000.values()[i]+":"
-	return dics_of_000
-
-
 def post_getpcthunk_handling(resdic):
 	for SectionName in resdic.keys():
 		if SectionName in CodeSections_WRITE: # 코드섹션이라면
@@ -66,8 +53,6 @@ def post_getpcthunk_handling(resdic):
 										TRASH = DISASM[DISASM.index('$')+1:DISASM.index(',')]
 										DISASM = DISASM.replace(TRASH, '_GLOBAL_OFFSET_TABLE_')
 										resdic[SectionName][addrlist[i+1]][1][orig_j] = DISASM
-							
-
 
 def not_global_symbolize_ExternalLinkedSymbol(resdic):
 	for SectionName in resdic.keys():
@@ -140,21 +125,22 @@ def symbolize_textsection(resdic):
 				for ADDR in resdic[section_from].keys(): 
 					orig_i_list = pickpick_idx_of_orig_disasm(resdic[section_from][ADDR][1])
 					for orig_i in orig_i_list:
-						destinations = extract_hex_addr(resdic[section_from][ADDR][1][orig_i])
-						for DESTINATION in destinations: 
-							if VSA_is_memoryAddr_ornot(resdic[section_from][ADDR][1][orig_i]) is True: # 심볼라이즈를 하고싶은 주소 DESTINATION 가 우리의 VSA결과 메모리주소라고 판단되었다면
-								if DESTINATION in resdic[section_to].keys(): 
-									# 심볼이름셋팅
-									if resdic[section_to][DESTINATION][0] != "": # if symbol already exist
-										simbolname = resdic[section_to][DESTINATION][0][:-1] # MYSYM1: --> MYSYM1
-									else: # else, create my symbol name 
-										simbolname = SYMPREFIX[0] + "MYSYM_" + str(symbolcount)
-										symbolcount = symbolcount + 1
-										resdic[section_to][DESTINATION][0] = simbolname + ":"
-									
-									resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DESTINATION),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
-									resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DESTINATION)[2:],simbolname) # 그게아니라 12 이렇게생겼을경우 12 --> MYSYM_1 치환 (그럴리는없겠지만?말이지.)
-
+						DISASM = resdic[section_from][ADDR][1][orig_i]
+						# COMMENT: 2018-01-22 VSA기능 추가! 경축! 나중에 커멘트 이거 지우쟝.
+						# destinations = extract_hex_addr(resdic[section_from][ADDR][1][orig_i])
+						destinations = VSA_and_extract_addr(DISASM)
+						
+						for DEST in destinations: 
+							if DEST in resdic[section_to].keys(): 
+								# 심볼이름셋팅
+								if resdic[section_to][DEST][0] != "": # if symbol already exist
+									simbolname = resdic[section_to][DEST][0][:-1] # MYSYM1: --> MYSYM1
+								else: # else, create my symbol name 
+									simbolname = SYMPREFIX[0] + "MYSYM_" + str(symbolcount)
+									symbolcount = symbolcount + 1
+									resdic[section_to][DEST][0] = simbolname + ":"
+								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
+								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST)[2:],simbolname) # 그게아니라 12 이렇게생겼을경우 12 --> MYSYM_1 치환 (그럴리는없겠지만?말이지.)
 	return resdic
 
 
