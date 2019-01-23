@@ -267,6 +267,9 @@ p_PATTERN_04R.append(re.compile(' shr'   + RM32['R_REG']))
 
 
 # 0-operand instruction. TODO: 뒤에뭐 주석빼고는 아무것도 안붙어야할텐데.(아냐 절레절레. ret 0x10이런것만 보더라도 붙자나,,크흑 결과가 달라진다구우.) [주석 or notthing] 에 관한 regex 만들자
+# 이걸로인해서 레지스터 중 뭔가가 달라지는 경우가 있을까?ㅎㅅㅎ 그런경우, 에뮬레이션하는것들중 del 을 해줘야지..
+# 알아내려면 하나하나 실험해야 하는데... 그럴만한 가치가 있을까?ㅎㅅㅎ
+# 없을거같애. 하지말자그냥
 p_PATTERN_05.append(re.compile(' cbw'      ))
 p_PATTERN_05.append(re.compile(' cwde'     ))
 p_PATTERN_05.append(re.compile(' clc'      ))
