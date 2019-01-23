@@ -298,11 +298,6 @@ def ishex(str):
 
 
 
-
-
-
-
-
 # TODO: 이름바꺼라. extract_hex_values 으로. 사실, 이거 addr를 리턴하는게 아니라 모든 hex값을 리턴하는거자나?
 def extract_hex_addr(line):
 	'''

@@ -223,18 +223,36 @@ if __name__=="__main__":
 	#여기서부터는 symbolize_lazy 루틴임.
 	getpcthunk_to_returnoriginalADDR(resdic)
 
-	add_stuffs(resdic, mainaddr) # 레이지리졸브에 필요한 백업함수를 추가하고, 그리구 main앞에 시그널핸들러를 등록하쟝
+	setup(resdic, mainaddr) # 레이지리졸브에 필요한 백업함수를 추가하고, 그리구 main 앞에 시그널핸들러를 등록하쟝
 
 	# 모든 점프에대해서 세그폴발생할수도있으니깐 우선 백업(레지스터랑 플래그레지스터)부터하쟝
-	jmp_to_PushalPushfJmp(resdic) 
+	jmp2pushalpushfjmp(resdic) 
 
 	# 모든 라인에 심볼을 붙인다
-	addLABEL_to_allLineofTextSection(resdic)
+	symbolize_alllines(resdic)
 
 	# 레이지 리졸버 함수덩어리를 추가한다
-	addLazyResolver2textSection(resdic)
+	CreateCRASHHANDLER(resdic)
 	print "[*] Add  -Wl,--section-start=.text=0x09000000 to compile.sh!!"
 	'''
+
+
+
+
+
+
+	# URGENT: 이거 테스트해보기 위해서 추가했당
+	add_someprefix_before_all_memory_reference(resdic)
+
+
+
+
+
+
+
+
+
+
 
 	SYMTAB = []
 	if options.usesymboltable is True:
