@@ -519,7 +519,7 @@ def gen_compilescript_for_sharedlibrary(LOC, filename):
 	cmd = "chmod +x " + saved_filename + "_compile.sh"
 	os.system(cmd)
 
-def gen_compilescript(LOC, filename):
+def gen_compilescript(LOC, filename, testingcrashhandler):
 	'''
 	laura@ubuntu:/mnt/hgfs/VM_Shared/reassemblablabla/src$ ldd lcrypto_ex
 		linux-gate.so.1 =>  (0xf774f000)
@@ -532,7 +532,11 @@ def gen_compilescript(LOC, filename):
 
 	onlyfilename = filename.split('/')[-1]	
 	cmd  = ""
-	cmd += "gcc -g -o "
+	cmd += "gcc "
+	if testingcrashhandler is True:
+		cmd += "-Wl,--section-start=.text=0x09000000 "
+
+	cmd += "-g -o "
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "

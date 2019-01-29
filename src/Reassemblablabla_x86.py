@@ -34,6 +34,7 @@ if __name__=="__main__":
 	parser.add_option("-l", "--location", dest="location", help="location to save result files")
 	parser.add_option("-s", "--shrinksize", dest="shrinksize", help="shrink output binary size by disignate local symbol", action="store_true")
 	parser.add_option("", "--usesymboltable", dest="usesymboltable", help="generated comment depending on existing symbol table", action="store_true") # for BiOASAN
+	parser.add_option("", "--testing", dest="testingcrashhandler", help="now testing about crashhandler relative features... hope it works without any issues.", action="store_true")
 	
 	parser.set_defaults(verbose=True)
 	(options, args) = parser.parse_args()
@@ -89,7 +90,6 @@ if __name__=="__main__":
 
 	# 컴파일타임에 자동으로추가됨. 그래서 .s에있어봣자 컴파일에러만 야기하는 쓸모없는것들제거 ['__gmon_start__', '_Jv_RegisterClasses', '_ITM_registerTMCloneTable', '_ITM_deregisterTMCloneTable']
 	#eliminate_weird_GLOB_DAT(T_rel['R_386_GLOB_DAT']) # COMMENT: 이 함수 이제 필요없다아... 왜냐면 쓸모없는것들은 STT_NOTYPE 속성이기 때문이다
-
 
 
 
@@ -156,7 +156,7 @@ if __name__=="__main__":
 	logging("now PIE_set_getpcthunk_loc")
 	PIE_set_getpcthunk_loc(resdic) # get_pc_thunk 를 호출하는 라인의 EIP를 resdic[name][3]에다가 쓴다. 주의: get_pc_thunk를 호출하는지안하는지는 symbolize_textsection 을 거친후에야 알수있음
 	logging("now PIE_calculated_addr_symbolize")
-	PIE_calculated_addr_symbolize(resdic)
+	PIE_calculated_addr_symbolize(resdic, options.testingcrashhandler)
 	
 
 	# ===남은것들중 GOT베이스로다가 데이터에접근하는놈들 심볼라이즈===
@@ -188,8 +188,9 @@ if __name__=="__main__":
 
 
 
+	# TODO: 아오 얜또뭐냐? 무슨함수냐? 여기서 크래시 나는거냐? ㄴㄴ. 우선 이건 아니다. 근데 이거 뭔가 쫌 위험하다 느낌에 ㅎ
 	logging("now add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array")
-	add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic)
+	addRoutineToGetGLOBALOFFSETTABLE_in_init_array(resdic)
 
 
 
@@ -223,17 +224,8 @@ if __name__=="__main__":
 	#여기서부터는 symbolize_lazy 루틴임.
 	getpcthunk_to_returnoriginalADDR(resdic)
 
-	setup(resdic, mainaddr) # 레이지리졸브에 필요한 백업함수를 추가하고, 그리구 main 앞에 시그널핸들러를 등록하쟝
 
-	# 모든 점프에대해서 세그폴발생할수도있으니깐 우선 백업(레지스터랑 플래그레지스터)부터하쟝
-	jmp2pushalpushfjmp(resdic) 
-
-	# 모든 라인에 심볼을 붙인다
-	symbolize_alllines(resdic)
-
-	# 레이지 리졸버 함수덩어리를 추가한다
-	CreateCRASHHANDLER(resdic)
-	print "[*] Add  -Wl,--section-start=.text=0x09000000 to compile.sh!!"
+	
 	'''
 
 
@@ -241,8 +233,29 @@ if __name__=="__main__":
 
 
 
-	# URGENT: 이거 테스트해보기 위해서 추가했당
-	add_someprefix_before_all_memory_reference(resdic)
+
+
+
+	if options.testingcrashhandler is True: # 이 블록안에서 주석처리하던가 말던가 하쟝 이제는 ㅎㅅㅎ
+		### 모든메모리참조 전에 레지스터 컨텍스트랑 컴백홈할때 컴백할 EIP를 백업한당,,,
+		add_someprefix_before_all_memory_reference(resdic)
+		
+		### 시그널핸들러 마련해두기~
+		symbolize_alllines(resdic) 
+		setupsignalhandler(resdic)
+	
+		### 시그널핸들러 설치해주기~
+		addRoutineToInstallSignalHandler_in_init_array(resdic) # COMMENT: 위에꺼랑 이거 두개는 셋트~ 왜냐면 시그널핸들러 설치해줄라면 우선은 MYSYM_CRASHHANDLER_START 가 이써야함 ㅎㅅㅎ
+		setup_some_useful_stuffs_for_crashhandler(resdic)
+		
+		### getpcthunk 가 원본주소를 리턴해야만이 크래시-친화적-디자인 이라고 할수있게따 이말이야
+		getpcthunk_to_returnoriginalADDR(resdic)
+	
+		print " [*] Add  -Wl,--section-start=.text=0x09000000 to compile.sh!!"
+
+
+
+
 
 
 
@@ -257,6 +270,7 @@ if __name__=="__main__":
 	SYMTAB = []
 	if options.usesymboltable is True:
 		SYMTAB = get_SYM_LIST(options.filename)
+
 	gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, options.comment, SYMTAB)
 
 
@@ -280,7 +294,7 @@ if __name__=="__main__":
 
 
 	else: # have main.. and not pie..!
-		gen_compilescript(LOC, options.filename)
+		gen_compilescript(LOC, options.filename, options.testingcrashhandler)
 	
 
 	onlyfilename = options.filename.split('/')[-1]

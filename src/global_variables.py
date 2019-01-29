@@ -16,6 +16,20 @@ DoNotWriteThisSection = [] # 걍 다 써줘봐봐우선.
 crts = "/usr/lib/i386-linux-gnu/crtn.o "
 SYMPREFIX = ['']
 
+GENERAL_REGISTERS = ['%eax', '%ebx', '%ecx', '%edx', '%edi', '%esi', '%ebp', '%esp', '%eip']
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -37,8 +51,6 @@ p_cmp = []
 p_cmp.append(re.compile(' cmp' + IMM + REG1REF))
 p_cmp.append(re.compile(' cmp' + REG1REF + REG))
 p_cmp.append(re.compile(' cmp' + REG + REG1REF))
-
-
 
 p_PATTERN_01  = [] # instruction + REG + RM32['R']
 p_PATTERN_01R = [] # instruction + REG + RM32['R']

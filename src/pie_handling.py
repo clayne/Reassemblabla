@@ -37,7 +37,7 @@ def PIE_set_getpcthunk_loc(resdic):
 
 # SectionDic[SORTED_ADDRESS[i]][3] = 만약 get_pc_thunk 호출부라면 EIP
 #                                    아니라면 substitute 되기때문에 소거되는 RegName 을 memorial 로다가 써줌 
-def PIE_calculated_addr_symbolize(resdic):
+def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 	SectionName = CodeSections_WRITE # 최종적으로 추가되는 코드색션
 	SectionName += []
 	count = 0
@@ -110,7 +110,6 @@ def PIE_calculated_addr_symbolize(resdic):
 
 							hit_pattern = 'NO'
 							# TODO: 이거 get_pc_thunk 바로뒤! 인지 아니면 뒤뒤뒤...라도 첫 add가 나오면 해주는지 확인 --> 후자임. 패치필요. 근데 패치하기위한 최소코드 꼼수가 생각안나서 우선 보류함 ㅎㅅㅎ
-							# TODO: 나중에 확장할땐 get_pc_thunk 이후의 add $0x1234, %eax 는 add $_GLOBAL_OFFSET_TABLE_, %eax로 바꾸어주자
 							if p_add.match(DISASM) and slice_count == 1:# 에뮬레이션을 해주고나서, 헥스값을 $_GLOBAL_OFFSET_TABLE_ 으로바꾼다
 								if hit_pattern == 'HIT':
 									break 
@@ -121,9 +120,12 @@ def PIE_calculated_addr_symbolize(resdic):
 								if REGLIST['ORDINARY_REGISTER'][0] in reg.keys():
 									reg[REGLIST['ORDINARY_REGISTER'][0]] = reg[REGLIST['ORDINARY_REGISTER'][0]] + HEX_VALUE[0] # 에뮬레이션
 
-
-								NEWDISASM = ' ' + INSTRUCTION + ' ' + '$_GLOBAL_OFFSET_TABLE_' + ', ' + '%' + REGLIST['ORDINARY_REGISTER'][0] # TODO:check it
-								resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
+								# COMMENT: 크래시친화적 디자인으로 확장할땐 get_pc_thunk 이후의 add $0x1234, %eax 는 add $_GLOBAL_OFFSET_TABLE_, %eax로 바꾸어주 ***면 안된다!***
+								if testingcrashhandler is True: 
+									NEWDISASM = DISASM # Preserve this adding offset
+								else:
+									NEWDISASM = ' ' + INSTRUCTION + ' ' + '$_GLOBAL_OFFSET_TABLE_' + ', ' + '%' + REGLIST['ORDINARY_REGISTER'][0] 
+									resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 								
 								print "[{}] {} : {} ---> (NEW BORN...{})".format(slice_count, hex(SORTED_ADDRESS[i]), DISASM, NEWDISASM)
 								slice_count += 1
@@ -1503,7 +1505,7 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 						print kkk
 					
 
-def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
+def addRoutineToGetGLOBALOFFSETTABLE_in_init_array(resdic):
 
 	CODEBLOCK_TEXT  = []
 	CODEBLOCK_INITARRAY = []
@@ -1522,7 +1524,7 @@ def add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array(resdic):
 	CODEBLOCK_TEXT.append(' ret #+++++') # 리턴 
 	CODEBLOCK_TEXT.append(' ')
 
-	CODEBLOCK_INITARRAY.append('MYSYM_INIT_ARRAY_0: #+++++')
+	CODEBLOCK_INITARRAY.append('MYSYM_INIT_ARRAY_SETGOT: #+++++')
 	CODEBLOCK_INITARRAY.append(' .long MYSYM_SET_GLOBAL_OFFSET_TABLE #+++++')
 
 
