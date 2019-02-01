@@ -30,51 +30,12 @@ def symbolize_alllines(resdic):
 #TODO: 뭔가 스택프레임 망가뜨리는함수있는지 화긴 ㄱㄱ
 def setup_some_useful_stuffs_for_crashhandler(resdic): # 레지스터 백업함수를 셋업해둔당
 	asm_stuffs = '''
-.lcomm MYSYM_EFLAGS, 4 # .lcomm 선언하면 자동으로 .bss에 들어간다. 
-.lcomm MYSYM_EAX, 4
-.lcomm MYSYM_ECX, 4
-.lcomm MYSYM_EDX, 4
-.lcomm MYSYM_EBX, 4
-.lcomm MYSYM_TEMP,4
-.lcomm MYSYM_EBP, 4
-.lcomm MYSYM_ESI, 4
-.lcomm MYSYM_EDI, 4
 .lcomm MYSYM_EIP, 4 #!!!
 .lcomm MYSYM_ESP, 4 #!!! 
 .lcomm MYSYM_CRASHADDR, 4
 .lcomm MYSYM_CRASHADDR_R, 4
 
-MYSYM_pushf:
-    pushf                   # EFLAGS -> (%esp) 
-    pop MYSYM_EFLAGS        #           (%esp) - MYSYM_EFLAGS 
-    ret
- 
-MYSYM_popf:
-    push MYSYM_EFLAGS
-    popf
-    ret
 
-MYSYM_backupregistercontext:
-	call MYSYM_pushf    #eflags 
-    mov %eax, MYSYM_EAX #1
-    mov %ecx, MYSYM_ECX #2 
-    mov %edx, MYSYM_EDX #3
-    mov %ebx, MYSYM_EBX #4
-    mov %ebp, MYSYM_EBP #5
-    mov %esi, MYSYM_ESI #6
-    mov %edi, MYSYM_EDI #7
-    ret
-
-MYSYM_restoreregistercontext:
-	call MYSYM_popf		#eflags
-    mov MYSYM_EAX, %eax #1
-    mov MYSYM_ECX, %ecx #2
-    mov MYSYM_EDX, %edx #3
-    mov MYSYM_EBX, %ebx #4
-    mov MYSYM_EBP, %ebp #5 
-    mov MYSYM_ESI, %esi #6
-    mov MYSYM_EDI, %edi #7
-    ret
 
 '''
 
@@ -194,17 +155,19 @@ def setupsignalhandler(resdic):
 	asm_piece_of_crashhandler += '#+++++'								+ '\n'
 	asm_piece_of_crashhandler
 
+	# 한고리한고리의 링크임
 	asm_piece_of_crashhandler  += ' cmp $%s, %%eax'						+ '\n'	# 원본 바이너리의 주소값과 비교
 	asm_piece_of_crashhandler  += ' jne %s'								+ '\n'	# 아니라면 다음조각으로 점프 
 
+	# 여기서부터 실제 크래시핸들러루틴
 	asm_piece_of_crashhandler  += ' lea %s, %%eax'						+ '\n'	# 일치한다면 : 1. 새주소(겉보기에심볼이름임)을  
 	asm_piece_of_crashhandler  += ' mov %%eax, MYSYM_CRASHADDR'			+ '\n'	#             								MYSYM_CRASHADDR 안에다가 앉힘 
 	asm_piece_of_crashhandler  += ' mov (%%eax), %%eax'					+ '\n'	# 			  2. 새주소에서 메모리 WRITE하여
 	asm_piece_of_crashhandler  += ' mov %%eax, MYSYM_CRASHADDR_R' 		+ '\n'	# 											MYSYM_CRASHADDR_R 안에다가 앉힘 (Mem Read하는 Branch에서 사용하기 위해. jmp (%eax) 같은 좆같은거,,)
 
-	asm_piece_of_crashhandler  += ' call MYSYM_restoreregistercontext'	+ '\n'	# RESTORE1. 레지스터컨텍스트를 복원합니다 
-	asm_piece_of_crashhandler  += ' mov MYSYM_ESP, %%esp'				+ '\n'  # RESTORE2. ESP 스택프레임을 복원합니다
-	asm_piece_of_crashhandler  += ' jmp *MYSYM_EIP'						+ '\n'	# RESTPRE3. EIP 를 복원합니다 (시그널핸들러를소환한자가 사전에 셋팅한 EIP로점프~)
+	asm_piece_of_crashhandler  += ' mov MYSYM_EIP, %%eax'				+ '\n'  # 컴백할 주소를...	
+	asm_piece_of_crashhandler  += ' mov %%eax, 0xdc(%%esp)'				+ '\n'  #               ...frame->sc.eip 에다가 집어넣은 후... 
+	asm_piece_of_crashhandler  += ' ret'								+ '\n'	# 												    ...sigreturn 으로 시그널핸들러 종료 
 	
 
 
@@ -335,15 +298,17 @@ def add_someprefix_before_all_memory_reference(resdic):
 			
 			
 			NEWDISASM.append(' # add_someprefix_before_all_memory_reference' 		+ ' ' + '#+++++')
-			# BACKUP1. 맨첨으로 우선 레지스터컨텍스트를 백업해 둡니당
-			NEWDISASM.append(' call MYSYM_backupregistercontext' 					+ ' ' + '#+++++')
-			
-			# BACKUP2. 위험한 라인의 EIP를 백업해 둡니다. --> 챌린징한요소: ' lea MYSYM_CRASHVIRTUALSYM_123, MYSYM_EIP 이거는 too many memory reference 걸림^^.....
+			# BACKUP1. 레지스터 컨텍스트 백업
+			NEWDISASM.append(' pushal' 												+ ' ' + '#+++++')
+			NEWDISASM.append(' pushf' 												+ ' ' + '#+++++')
+			# BACKUP2. 스택프레임 백업
+			NEWDISASM.append(' mov %esp, MYSYM_ESP'									+ ' ' + '#+++++')
+
+
+			# BACKUP3. 위험한 라인의 EIP를 백업해 둡니다. (크래시핸들러가 관리함)
 			NEWDISASM.append(' push $MYSYM_CRASHVIRTUALSYM_' + str(count) 			+ ' ' + '#+++++')
 			NEWDISASM.append(' pop MYSYM_EIP' 										+ ' ' + '#+++++')
 
-			# BACKUP3. 현재의 ESP도 백업합니다.
-			NEWDISASM.append(' mov %esp, MYSYM_ESP'									+ ' ' + '#+++++')
 
 			# BACKUP4. 위험한라인의 위험한곳을 백업합니다. - case1. 0x12(%eax,%ebx,2) 같이 한차원이동하는 메모리레퍼런스인경우 / case2. call %eax 같이 그냥 콜하는경우 모두 동일취급
 			NEWDISASM.append(' push %eax'					+ ' ' + '#+++++') 		# %eax 를 쓸것이다
@@ -360,8 +325,16 @@ def add_someprefix_before_all_memory_reference(resdic):
 
 
 			# 크래시핸들러가 컴백홈할 곳은 여기. 심볼선언합니다. 
-			NEWDISASM.append('MYSYM_CRASHVIRTUALSYM_' + str(count) + ':'  + ' ' + '#+++++')
+			NEWDISASM.append('MYSYM_CRASHVIRTUALSYM_' + str(count) + ':'  			+ ' ' + '#+++++')
 			
+			# BACKUP3 EIP 복원
+			'크래시 핸들러가 해줘뜸'
+
+			# BACKUP2. 스택프레임 복원
+			NEWDISASM.append(' mov MYSYM_ESP, %esp')
+			# BACKUP1. 레지스터 컨텍스트 복원
+			NEWDISASM.append(' popf'												+ ' ' + '#+++++')
+			NEWDISASM.append(' popal'												+ ' ' + '#+++++')
 			
 			
 			# 마지막으로 바뀐 디스어셈블리를 붙여줍니당~야호~

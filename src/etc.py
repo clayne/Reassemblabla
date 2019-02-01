@@ -534,7 +534,8 @@ def gen_compilescript(LOC, filename, testingcrashhandler):
 	cmd  = ""
 	cmd += "gcc "
 	if testingcrashhandler is True:
-		cmd += "-Wl,--section-start=.text=0x09000000 "
+		# cmd += "-Wl,--section-start=.dynsym=0x09000000 " #TODO: 이게 정석인거 알지? 이걸 어떻게든 고쳐서쓰는게 정석인데, 그냥 지금은 존나 뽀록으로다가 하는중
+		cmd += " -pie "
 
 	cmd += "-g -o "
 	cmd += onlyfilename + "_reassemblable "
