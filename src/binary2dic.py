@@ -16,129 +16,6 @@ from global_variables import *
 from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
 
-def extract_OPCODE_and_OPCODEinModRM(hexified_i_byte):
-	prefix = ['f3', 'f2', 'f0', '2e', '36', '3e', '26', '64', '65', '66', '67']
-
-	i = 0
-	found_opcode = 0
-
-	while i < len(hexified_i_byte)/2:
-		_B = hexified_i_byte[i*2:i*2+2]
-		if _B in prefix:
-			"pass...no prefix allowed..."
-		elif found_opcode == 0:
-			found_opcode = 1
-			OPCODE = _B
-		else: # found opcode already!
-			ModRM = _B
-			break
-		i += 1
-
-	ModRM = int('0x'+ModRM, 16)
-	ModRM = "{0:b}".format(ModRM)
-	ModRM = str(ModRM)
-
-	OPCODE_inside_ModRM_byte = ModRM[2:5]
-	return OPCODE, int(OPCODE_inside_ModRM_byte,2)
-
-def BUG_B_HANDLING(OPCODE, OPCODE_inside_ModRM_byte):
-	digit = OPCODE_inside_ModRM_byte
-
-	MY_mnemoonic = ''
-	if OPCODE == '80':
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'add'
-		elif digit == 1: MY_mnemoonic = 'or'
-		elif digit == 2: MY_mnemoonic = 'adc'
-		elif digit == 3: MY_mnemoonic = 'sbb'
-		elif digit == 4: MY_mnemoonic = 'and'
-		elif digit == 5: MY_mnemoonic = 'sub'
-		elif digit == 6: MY_mnemoonic = 'xor'
-		elif digit == 7: MY_mnemoonic = 'cmp'
-
-	elif OPCODE == '81':		
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'and'
-		elif digit == 1: MY_mnemoonic = 'or'
-		elif digit == 2: MY_mnemoonic = 'adc'
-		elif digit == 3: MY_mnemoonic = 'sbb'
-		elif digit == 4: MY_mnemoonic = 'and'
-		elif digit == 5: MY_mnemoonic = 'sub'
-		elif digit == 6: MY_mnemoonic = 'xor'
-		elif digit == 7: MY_mnemoonic = 'cmp'
-
-	elif OPCODE == '83':
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'add'
-		elif digit == 1: MY_mnemoonic = 'or'
-		elif digit == 2: MY_mnemoonic = 'adc'
-		elif digit == 3: MY_mnemoonic = 'sbb'
-		elif digit == 4: MY_mnemoonic = 'and'
-		elif digit == 5: MY_mnemoonic = 'sub'
-		elif digit == 6: MY_mnemoonic = 'xor'
-		elif digit == 7: MY_mnemoonic = 'cmp'
-
-	elif OPCODE == '71':
-		if 0: "Nothing"
-		elif digit == 2: MY_mnemoonic = 'PSRLW'
-		elif digit == 4: MY_mnemoonic = 'PSRAW'
-		elif digit == 6: MY_mnemoonic = 'PSLLW'
-
-	elif OPCODE == '72':
-		if 0: "Nothing"
-		elif digit == 2: MY_mnemoonic = 'PSRLD'
-		elif digit == 4: MY_mnemoonic = 'PSRAD'
-		elif digit == 6: MY_mnemoonic = 'PSLLD'
-
-	elif OPCODE == '73':
-		if 0: "Nothing"
-		elif digit == 2: MY_mnemoonic = 'PSRLQ'
-		elif digit == 3: MY_mnemoonic = 'PSRLDQ'
-		elif digit == 6: MY_mnemoonic = 'PSLLQ'
-		elif digit == 7: MY_mnemoonic = 'PSLLDQ'
-
-	elif OPCODE == 'c0':
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'rol'
-		elif digit == 1: MY_mnemoonic = 'ror'
-		elif digit == 2: MY_mnemoonic = 'rcl'
-		elif digit == 3: MY_mnemoonic = 'rcr'
-		elif digit == 4: MY_mnemoonic = 'shl'
-		elif digit == 6: MY_mnemoonic = 'shr'
-		elif digit == 7: MY_mnemoonic = 'sar'
-
-	elif OPCODE == 'c1':
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'rol'
-		elif digit == 1: MY_mnemoonic = 'ror'
-		elif digit == 2: MY_mnemoonic = 'rcl'
-		elif digit == 3: MY_mnemoonic = 'rcr'
-		elif digit == 4: MY_mnemoonic = 'shl'
-		elif digit == 6: MY_mnemoonic = 'shr'
-		elif digit == 7: MY_mnemoonic = 'sar'
-
-	elif OPCODE == 'ba':
-		if 0: "Nothing"
-		elif digit == 4: MY_mnemoonic = 'bt'
-		elif digit == 5: MY_mnemoonic = 'bts'
-		elif digit == 6: MY_mnemoonic = 'btr'
-		elif digit == 7: MY_mnemoonic = 'btc'
-
-	elif OPCODE == 'c6':
-		if 0: "Nothing"
-		elif digit == 0: MY_mnemoonic = 'mov'
-
-	elif OPCODE == 'c7':
-		if digit == 0: MY_mnemoonic = 'mov'
-
-	elif OPCODE == 'f6':
-		if digit == 0: MY_mnemoonic = 'test'
-
-	elif OPCODE == 'f7':
-		if digit == 0: MY_mnemoonic = 'test'
-
-	return MY_mnemoonic
-
 def bugB(i_op_str):
 	digit = i_op_str.split(', ')[0] # $0xf0
 	digit = digit[1:]               # 0xf0
@@ -151,9 +28,8 @@ def bugB(i_op_str):
 
 def KEYSTONE_asm(CODE):	
 	try:
-		# Initialize engine in X86-32bit mode
-		ks = Ks(KS_ARCH_X86, KS_MODE_32)
-		ks.syntax = KS_OPT_SYNTAX_ATT # ATT신텍스
+		ks = Ks(KS_ARCH_X86, KS_MODE_32) 	# Initialize engine in X86-32bit mode
+		ks.syntax = KS_OPT_SYNTAX_ATT 		# ATT신텍스
 		encoding, count = ks.asm(CODE)
 	except KsError as e:
 		encoding = []
@@ -175,7 +51,6 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 	MY_mnemoonic = ''
 	DISASSEMBLY_for_reassemble = ''
 
-
 	_sendaddr = _sbaseaddr + _ssize
 	while _sbaseaddr + _offset < _sendaddr: # 베이스어드레스도 바뀌고 오프셋도 바뀜
 		_errorcode = 'default' # errorcode init
@@ -192,12 +67,9 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 			else:
 				_displacement = ''
 				
-			
 			#[DISP-B] RELATIVE8/RELATIVE16 HANDLING FOR JMP
 			JMP_REL32 = {'0f83':['jae', 'jnb', 'jnc'],'0f82':['jb', 'jc', 'jnae'],'0f81':['jno'],'0f80':['jo'],'0f87':['ja', 'jnbe'],'0f86':['jbe', 'jna'],'0f85':['jne', 'jnz'],'0f84':['je', 'jz'],'0f89':['jns'],'0f88':['js'],'0f8a':['jp', 'jpe'],'0f8c':['jl', 'jnge'],'0f8b':['jnp', 'jpo'],'e9':['jmp'],'0f8f':['jg', 'jnle'],'0f8e':['jle', 'jng'],'0f8d':['jge', 'jnl']}
-			
-			# TODO: REL8 테이블 만들기 
-			JMP_REL8 = {'TODO':'TODO'}
+			JMP_REL8 = {'TODO':'TODO'} # TODO: REL8 테이블 만들기
 			if i.mnemonic.startswith('j'):
 				_OPCODE = ''
 				for _O in i.opcode: # OPCODE 를 스트링으로 변환하는 작업
@@ -211,13 +83,13 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 			
 			#[DISP-C] SWAP DIRECTIVE(.s) handling		
 			'''
-			SKIP 함
+			SKIP. 그 이유는
 			- .d32와 .s를 중복해서 못쓴다. 
 				* 중요도는 .d32가 큼. 왜냐하면 코드의 length에 직결되기 때문이다
 				* 그리고 .s 구현하려면 [??? r/m32 r32] and [??? r32 r/m32] 를 모두 가지는 인스트럭션(ex. mov)를 모두 구해야하는데 파싱해와서 할수있겠지만 귀찮음. 
 				* 따라서 .s를 희생하자 
+				* TODO: 문제발생시 언젠가 핸들링 추가하기.
 			'''
-			
 			
 			'''
 			prefix[0] : 2. String manipulation instruction prefixes(REP(F3), REPE(F3), REPNE(F2)) + LOCK (F0)
@@ -226,7 +98,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 			prefix[3] : 5. Address override, 67h (decode addresses in the rest of the instruction in 16-bit mode if currently in 32-bit mode, or decode addresses in 32-bit mode if currently in 16-bit mode)
 			'''
 			
-			#[BUG-A] CAPSTONE 'repz' IGNORING ISSUE HANDLING
+			#[BUG-A] 캡스톤에서 'repz' 프리픽스를 무시한 채로 디스어셈블하는 이슈. 캡스톤측에서는 이슈 아니라고 주장하지만, 리어셈블시 바이트패턴이 바뀔 수 있음. 
 			if binascii.hexlify(i.bytes).startswith('f3') or binascii.hexlify(i.bytes).startswith('f2') : # REP/REPE, REPNE
 				if not i.mnemonic.startswith('rep'): # BUG!
 					_byte = binascii.hexlify(_scontents[_offset:_offset+1])
@@ -245,27 +117,17 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					_offset = 0 
 					_errorcode = 'rep handling'
 					break       # restart "cs.disasm"
-			
-			#[X] NON-ISSUE: Capstone 에서 Opcode inside ModR/M byte를 처리해주지 않는 문제 (https://github.com/aquynh/capstone/issues/1238)
-			'''
-			if i.mnemonic == 'xorl': 
-				#OPCODE, digit = extract_OPCODE_and_OPCODEinModRM(binascii.hexlify(i.bytes))
-				#MY_mnemoonic = BUG_B_HANDLING(OPCODE, digit)
-				_errorcode = 'default'
-			'''
 
-			# [BUG-B] cmp esi, -1 이것을 cmp esi, 0xff 으로 잘못 디스어셈블.. https://github.com/aquynh/capstone/issues/1237
-			# 83 /7 ib	CMP r/m32,imm8
+			# [BUG-B] cmp esi, -1 이것을 cmp esi, 0xff 으로 잘못 디스어셈블함 (https://github.com/aquynh/capstone/issues/1237)
 			if binascii.hexlify(i.bytes).startswith('83'):
 				if i.mnemonic.startswith('cmp'):
 					MY_op_str = bugB(i.op_str)
 					_errorcode = 'default'
 
 
-			#[BUG-C] CAPSTONE machinecode'testb %cl, %dl' --> disassembly'testb %dl, %cl' ISSUE HANDLING
+			#[BUG-C] 캡스톤에서 'testb %cl, %dl'을 'testb %dl, %cl'으로 디스어셈블하는 이슈.
 			if (i.mnemonic == 'testb') or (i.mnemonic == 'testw'):
-				# 두개의 operand 모두 register 일때에만 이런 이슈가 발생함. 
-				if binascii.hexlify(i.bytes).startswith('84') or binascii.hexlify(i.bytes).startswith('85'): # 84(TEST r/m8,r8), 85(TEST r/m16,r16)
+				if binascii.hexlify(i.bytes).startswith('84') or binascii.hexlify(i.bytes).startswith('85'): # # 두개의 operand 모두 register 일때에만 이런 이슈가 발생함. .ex) 84(TEST r/m8,r8), 85(TEST r/m16,r16)
 					DISASSEMBLY_for_reassemble   = i.mnemonic + _displacement + ' ' + i.op_str
 					ORIG_ASSEMBLY = str(binascii.hexlify(i.bytes))
 					REEE_ASSEMBLY = str(KEYSTONE_asm(DISASSEMBLY_for_reassemble))
@@ -276,7 +138,7 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				_errorcode = 'default'
 			
 
-			#[BUG-D] CAPSTONE 0x66, 0x90 TO 'nop' ISSUE HANDLING 
+			#[BUG-D] 캡스톤에서 0x66, 0x90 (2-byte nop)을 'nop'으로 디스어셈블하는 이슈.
 			if binascii.hexlify(i.bytes) == '6690':
 				_errorcode = 'goto data' # 데이터처리 부분으로 보내버리기 
 				break # restart "cs.disasm"
@@ -298,20 +160,18 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				_errorcode = 'default'
 
 
-			#[BUG-G] SRC and DEST location changed! on bound instruction... https://github.com/aquynh/capstone/issues/1242 
-			# (버그있는)as에게 주기위해서 MY_op_str를 설정해주지만, 위대하신 keystone-capstone 은 올바른 disassembly를 입력받길원하시므로 
+			#[BUG-G] bound 인스트럭션에서 SRC 와 DEST 가 바뀐다. https://github.com/aquynh/capstone/issues/1242 
+			#        이건 캡스톤 버그가 아니라 ATT 디자인 버그였음! https://stackoverflow.com/questions/52158999/is-this-assembler-bug-bound-instruction
 			if i.mnemonic.startswith('bound'):
 				BOUNDinst = i.op_str.split(', ')
 				MY_op_str = BOUNDinst[1] + ', ' + BOUNDinst[0]
 				DISASSEMBLY_for_reassemble = i.mnemonic + _displacement + i.op_str
 				_errorcode = 'default'
 
-			# 이거 왜 비활성화해줬냐면.. lea 0x804fd20(,%eax,4),%ebx 이것도 바이트패턴으로 디스어셈블해가지구
-			# 데이터처럼 생겨버려가지고
-			# 심볼화해야할 0x804fd20 심볼화를 못해서 ㅎㅅㅎ...... 
-			# 그리고 생각해보면 이걸 굳이 핸들링 해주는게 의미가 있을까 싶음...
+			# TODO: 추후에 다시 올바르게 디자인해준 후 활성화할 것. 
+			# (이거 왜 비활성화해줬냐면..멀쩡한 7바이트 인스트럭션인 lea 0x804fd20(,%eax,4),%ebx 이것도 바이트패턴으로 디스어셈블해서 심볼화해야할 0x804fd20 심볼화를 못하게 됨...) 
 			'''
-			# [BUG-EvictedFromBugList:)] lea 0x0(%edi,%eiz,1),%edi 의 7 byte nop을  lea  0x0(%edi),%edi 으로 디스어셈블함 ㅠ 
+			# [BUG-EVICTED FROM BUG LIST] lea 0x0(%edi,%eiz,1),%edi 의 7 byte nop을  lea  0x0(%edi),%edi 으로 디스어셈블함 ㅠ 
 			if i.mnemonic.startswith('lea') and  i.size is 7:
 				MY_bytes = binascii.hexlify(i.bytes)
 				for k in xrange(len(binascii.hexlify(i.bytes))):
@@ -328,11 +188,10 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				_errorcode = 'default' # 8dbc2700000000
 			'''
 
-			# [ADDITIONAL FEATURE] undocumented instruction salc handling
+			# [BUG-F] undocumented instruction salc handling
 			if i.mnemonic == 'salc': 
 				_errorcode = 'goto data'
 				break
-			
 
 			#[DEFAULT-A] NORMAL DISASSEMBLE
 			if _errorcode == 'default' :	
@@ -351,11 +210,10 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 				
 				_offset = _offset + i.size # 다음 오프셋을 설정 
 			
-				# TODO: 디스어셈블리와 리어셈블리가 다른경우가 있는지 확인하기 위해 추가함. 나중에 삭제고고
 				if DISASSEMBLY_for_reassemble == '':
 					DISASSEMBLY_for_reassemble = MY_mnemoonic + _displacement + ' ' + MY_op_str
 				else:
-					"위의 어디에선가 설정해줬을것이므로 그걸 그대로 써라. "
+					'위의 어디에선가 설정해줬을것이므로 그걸 그대로 써라.'
 
 				ORIG_ASSEMBLY = str(binascii.hexlify(i.bytes))
 				RE___ASSEMBLY = str(KEYSTONE_asm(DISASSEMBLY_for_reassemble))
@@ -367,40 +225,22 @@ def disasm_capstone(_scontents, _sbaseaddr, _ssize):
 					"DEFFERENT because capstone cannot understans 'long' suffix... "
 				else:
 					if ORIG_ASSEMBLY != RE___ASSEMBLY:
-						"This function is Temroparlly disabled"
-						# p_rint "-----[LOG] DIFFERENT BETWEEN BINARY AND RE-ASSEMBLY-----"
-						# p_rint "* DISASM   : " + DISASSEMBLY_for_reassemble
-						# p_rint "* ORIG     : " + ORIG_ASSEMBLY
-						# p_rint "* KEYSTONE : " + RE___ASSEMBLY
-						# p_rint "-------------------------------------------------------"
+						'This function is Temroparlly disabled'
+						'''
+						print "-----[LOG] DIFFERENT BETWEEN BINARY AND RE-ASSEMBLY-----"
+						print "* DISASM   : " + DISASSEMBLY_for_reassemble
+						print "* ORIG     : " + ORIG_ASSEMBLY
+						print "* KEYSTONE : " + RE___ASSEMBLY
+						print "--------------------------------------------------------"
+						'''
 				DISASSEMBLY_for_reassemble = '' # init
-				MY_op_str = ''   # init
-				MY_mnemoonic = '' # init
-
-				# logging("=============================================")
-				# logging("mnemonic     : {}".format(i.mnemonic)   )
-				# logging("op_str       : {}".format(i.op_str)   )
-				# logging("")
-				# logging("groups       : {}".format(i.groups)    )
-				# logging("regs_read    : {}".format(i.regs_read)   )
-				# logging("regs_write   : {}".format(i.regs_write))
-				# logging("")
-				# logging("inst ID      : {}".format(i.id)   # instruction ID )
-				# logging("size         : {}".format(i.size) # length of instruction)
-				# logging("prefix       : {}".format(i.prefix))
-				# logging("opcode       : {}".format(i.opcode))
-				# logging("addr_size    : {}".format(i.addr_size))
-				# logging("modrm        : {}".format(i.modrm))
-				# logging("disp         : {}".format(i.disp))
-				# logging("sib          : {}".format(i.sib))
-				# logging("instruction  : {}".format(binascii.hexlify(i.bytes)) # real byte of instruction)
-				# logging("")
-				
+				MY_op_str = ''   				# init
+				MY_mnemoonic = '' 				# init
 				
 				 
-		#[DEFAULT-B] EXCAPTION: DATA INTERLEAVED INSIDE CODE SECTION ... Suddenly fallen into Undergroud world, Mt.Avot (DATA HANDLING PART)
+		#[DEFAULT-B] 코드섹션 안에 있는 데이터의 경우 바이트로 때려박아버린다.
 		if _errorcode == 'default' or _errorcode == 'goto data':
-			if _sbaseaddr + _offset < _sendaddr : # 현재지점이 end address 지점을 넘어가부리면 안댐
+			if _sbaseaddr + _offset < _sendaddr : # 현재지점이 end address 지점을 넘어가버리는 경우 중단
 				_saddress = _sbaseaddr + _offset
 				dics_of_text[_saddress] = 	[
 											'', 
@@ -432,7 +272,7 @@ def binarydata2dic(filename):
 	binfile = f.read()
 	
 	for SectionName in DataSections_WRITE:
-		if SectionName == '.bss': # bss 는 초기화되면서 0으로 채워질것이기 때문에 데이터를 굳이 때려박지 않아도 된다고 함...
+		if SectionName == '.bss': # bss 는 초기화되면서 0으로 채워질것이기 때문에 데이터를 굳이 때려박지 않아도 됨.
 			continue
 		if bin.get_section_by_name(SectionName) != None: # 섹션이 있는지 검사
 
@@ -454,12 +294,11 @@ def binarydata2dic(filename):
 								]
 			resdic[SectionName] = dics_of_data
 
-	# zero-fill-on-demand
-	zeroinit_section = ['.bss']
-	s_start = bin.get_section_by_name('.bss').header.sh_addr
+	# zero-fill-on-demand 섹션의 경우 0의 갯수로 size를 지정한다. 
+	s_start  = bin.get_section_by_name('.bss').header.sh_addr
 	s_offset = bin.get_section_by_name('.bss').header.sh_offset
-	s_size = bin.get_section_by_name('.bss').header.sh_size
-	dics_of_data = {} # initialize 0x00 from sh_addr to sh_addr+sh_size
+	s_size   = bin.get_section_by_name('.bss').header.sh_size
+	dics_of_data = {}
 	for j in xrange(s_size):
 		addr = s_start + j
 		dics_of_data[addr] = [
@@ -473,7 +312,6 @@ def binarydata2dic(filename):
 	
 	return resdic
 
-# capstone 버전
 def binarycode2dic(filename, SHTABLE): 
 	f = open(filename, 'rb')
 	fread = f.read()
@@ -491,34 +329,27 @@ def binarycode2dic(filename, SHTABLE):
 			resdic[_sname] = disasm_capstone(_scontents, _sbaseaddr, _ssize) 
 		else:
 			"no.."
-	resdic['.dummy'] = {} # dummy section for PIE
 	return resdic
 
 
 
-def get_SYM_LIST(filename): # Named symbol의 주소를갖다가 파싱해가지고 리스트로 리턴해줌. 심볼들의 주소가 왜필요하냐면, .data에서 named symbol사이사이 레드존을 추가해줘야하기때문임
+def get_SYM_LIST(filename): # BiOASAN compatibility feature : Named symbol 의 주소 파싱 후 리스트로 리턴
 	bin = ELFFile(open(filename,'rb')) 
 	SYM_LIST = []
 	for section in bin.iter_sections():
 		if not isinstance(section, SymbolTableSection):
 			continue
 		else:
-			if section.name == '.dynsym':
+			if section.name == '.symtab': 
 				for symbol in section.iter_symbols():
-					'Dynamic symbol parsing routine is disabled.. Because it is get_SYM_LIST function'
-
-			elif section.name == '.symtab': 
-				for symbol in section.iter_symbols():
-					if symbol.name != '': # 실존하시는 심볼이라면 ㅋㅋ
+					if symbol.name != '': # 실존하시는 심볼이라면
 						if symbol.entry.st_value not in SYM_LIST:
 							SYM_LIST.append(symbol.entry.st_value)
 	return SYM_LIST
 
 
 
-def get_DYNSYM_LIST(filename): # 크오오.. 이렇게하면 알아서 다이나믹만 파싱해와다가 주는구나 
-
-	# STT_NOTYPE, STT_OBJECT, STT_FUNC, STT_SECTION, STT_FILE, STT_COMMON, STT_LOOS, STT_HIOS, STT_LOPROC, STT_HIPROC 등 졸라많음. 나중에 확장할때 참고. 
+def get_DYNSYM_LIST(filename):
 	DYNSYM_LIST = {}
 
 	bin = ELFFile(open(filename,'rb')) 
@@ -535,20 +366,15 @@ def get_DYNSYM_LIST(filename): # 크오오.. 이렇게하면 알아서 다이나
 							DYNSYM_LIST[str(symbol.name)] = 'STT_OBJECT'
 						elif symbol.entry.st_info['type'] == 'STT_NOTYPE':
 							DYNSYM_LIST[str(symbol.name)] = 'STT_NOTYPE'
-
-			elif section.name == 'symtab': # 섹션이름이 .symtab 이라면 우리의 고려대상이 아님. 우리의툴은 스트립된바이너리를 대상으로 하므로 ㅎㅎ 
-				'We do not need .symbol section :)'
-
+						# 이외에도 STT_NOTYPE, STT_OBJECT, STT_FUNC, STT_SECTION, STT_FILE, STT_COMMON, STT_LOOS, STT_HIOS, STT_LOPROC, STT_HIPROC 등 많음. 나중에 확장할때 참고. 
 	return DYNSYM_LIST
 
-def get_relocation_tables(filename): # TODO: get_relocation_tables 함수이름 마음에안든다 바꿔라 
-	
+def get_relocation_tables(filename):
 	DYNSYM_LIST = get_DYNSYM_LIST(filename)
-	
-	RELOSYM_LIST = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 우선 바이너리의 심볼테이블에도(/bin/dash) 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 부족함...  
+	RELOSYM_LIST = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 예를들어 /bin/dash 에는 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 없음.  
 	RET = {'STT_FUNC':{}, 'STT_OBJECT':{}, 'STT_NOTYPE':{}}
 
-	R_TYPES = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
+	TYPES = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
 
 	bin = ELFFile(open(filename,'rb'))
 	for section in bin.iter_sections():
@@ -557,10 +383,10 @@ def get_relocation_tables(filename): # TODO: get_relocation_tables 함수이름 
 		else:
 			symtable = bin.get_section(section['sh_link']) # symtable = '.dynsym' 섹션임. sh_link 정보를가지고 어떤 섹션에 접근을 하는구나. 
 			for rel in section.iter_relocations():
-				_type = rel['r_info_type'] # rel['r_offset'], rel['r_info'], rel['r_info_type'], rel['r_info_sym']
+				_type = rel['r_info_type'] 
 				symbol = symtable.get_symbol(rel['r_info_sym'])
 				if symbol.name != '':
-					RELOSYM_LIST[R_TYPES[_type]][rel['r_offset']] = symbol.name
+					RELOSYM_LIST[TYPES[_type]][rel['r_offset']] = symbol.name
 	'''
 	현재까지 RELOSYM_LIST 상태는 다음과 같다. 
 	R_386_COPY : {}
@@ -577,89 +403,7 @@ def get_relocation_tables(filename): # TODO: get_relocation_tables 함수이름 
 					RET['STT_FUNC'].update({ADDR:symname})
 				elif DYNSYM_LIST[symname] is 'STT_OBJECT':
 					RET['STT_OBJECT'].update({ADDR:symname})
-				elif DYNSYM_LIST[symname] is 'STT_NOTYPE': # STT_NOTYPE 에 해당하는것들중 대표적인게 _Jv_RegisterClasses 인데, 이런심볼은 심볼라이즈 안해줘야하는거 알지?
+				elif DYNSYM_LIST[symname] is 'STT_NOTYPE': # ex) _Jv_RegisterClasses 같은것들. 이 타입의 객체는 심볼라이즈해주면 컴파일에러남. (컴파일러가 자동으로 추가해주므로, 사전에 있을시에 문제되는것들)
 					RET['STT_NOTYPE'].update({ADDR:symname})
-
 	return RET
-
-
-
-
-
-# input : 파일이름
-# output : '.rel.dyn' 등 특정섹션의 readelf -a 결과를 파싱해서 리턴함['001b1edc', '00069b06', 'R_386_GLOB_DAT', '001b2be8', '__progname_full'] 
-#          참고로 reldyn은 Full_Relro 에서만 사용됨. 
-def readelf(sectionname, filename):
-	_from_no = 0
-	_to_no   = 0
-	_beforeline = 'dummy'
-
-	cmd = 'readelf -a --wide ' + filename
-	res = subprocess.check_output(cmd, shell=True)
-	lines = res.splitlines() 
-	for i in xrange(len(lines)):
-		if _beforeline == '':                                # 특징 1 : 맨앞에 엔터를 가짐
-			if '\'' + sectionname + '\'' in lines[i]:        # 특징 2 : 'sectionname' 을 포함하고 
-				if lines[i].endswith('entries:'):            # 특징 3 : 'entries:' 로 끝남
-					_from_no = i + 2 # line 0 (Relocation section '.rel.dyn' 어쩌구..), line 1 (Offset Info Type 어쩌구..) 제외
-					for j in xrange(_from_no, len(lines)):
-						if lines[j] == '':                   # 특징 4 : 테이블이 끝나면 또 엔터를 가짐
-							_to_no = j
-							break
-					break
-		_beforeline = lines[i]
-	lines = lines[_from_no:_to_no]
-
-	if len(lines) < 1:
-		logging("There's no table named [" + sectionname + "]...")
-		return {}
-
-	max_column_entry_no = 0
-	for i in xrange(len(lines)):
-		lines[i] = re.sub('\s+',' ',lines[i]).strip() # duplicate space, tab --> single space
-		lines[i] = lines[i].split(' ')
-		
-
-		if len(lines[i]) > max_column_entry_no:
-			max_column_entry_no = len(lines[i])
-
-	i = len(lines) - 1
-	while i >= 0:
-		if len(lines[i]) < max_column_entry_no:
-			del lines[i]  # 하등 쓸모없는 엔트리 3개짜리 라인들을 제외 ("0002b0fc  00000008 R_386_RELATIVE")
-		i -= 1
-
-	return lines
-
-
-
-# ATTR_select
-# COLUMN_key
-# COLUMN_value
-# COLUMN_attr
-
-# TODO: KeyColomn 과 ValueColomn을 둘다 받도록 하자 
-def TwoColumnize(readelfEntryTableName, TABLE, ATTR_select, COLUMN_attr, COLUMN_key, COLUMN_value):
-	TwoColumnTABLE = {}
-
-	if readelfEntryTableName == 'Relocation section':
-		idx = {'Offset':0, 'Info':1, 'Type':2, 'Sym.Value':3, 'Sym. Name':4}
-	elif readelfEntryTableName == 'Symbol table':
-		idx = {'Num:':0, 'Value':1, 'Size':2, 'Type':3, 'Bind':4, 'Vis':5, 'Ndx':6, 'Name':7}
-
-	# for addr in TABLE.keys():
-	for i in xrange(len(TABLE)):
-		line = TABLE[i]
-		if line[idx[COLUMN_attr]] == ATTR_select:
-			key = int('0x' + line[idx[COLUMN_key]], 16)
-			if key != 0: # 주소값 0인것들은 하등 노쓸모이다. 
-				externalname = line[idx[COLUMN_value]]
-				if '@' in externalname:
-					externalname = externalname[:externalname.index('@')] # getpwnam@GLIBC_2.0 -> getpwnam
-				TwoColumnTABLE[key] = externalname
-
-	return TwoColumnTABLE
-
-
-
 

@@ -14,7 +14,7 @@ from etc import *
 
 def VSA_and_extract_addr(DISASM):
 	'''
-	- extract every hex value from 1 DISASM
+	extract hex value that correspond to memory reference
 	- ex)
 		mov    $0x20804,%al              --> []
 		je     804841b <frame_dummy+0xb> --> [804841b] 
@@ -36,7 +36,7 @@ def VSA_and_extract_addr(DISASM):
 			OPCODE = DISASM[0]
 			if OPCODE.startswith('.'):  					# STOP-1. Assembler directive 인 경우 스톱.
 				break
-			if OPCODE.startswith('lea'): 					# STOP-2. LEA(메모리값이긴하지만, 메모리참조연산은 아니다.)
+			if OPCODE.startswith('lea'): 					# STOP-2. LEA (메모리값이긴하지만, 메모리참조연산은 아니므로 스톱.)
 				break
 
 			if i == 0: 										# SKIP-1. 인스트럭션이라면(DISASM[0]) 넘겨라
@@ -57,6 +57,5 @@ def VSA_and_extract_addr(DISASM):
 					continue  
 				if ishex(DISASM[i]): 
 					addrlist.append(int('0x'+DISASM[i],16)) 
-
 	return addrlist
 		
