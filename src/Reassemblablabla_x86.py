@@ -151,8 +151,7 @@ if __name__=="__main__":
 	logging("now fill_blanked_symbolname_toward_GOTSECTION")
 	fill_blanked_symbolname_toward_GOTSECTION(resdic)
                                                                                                                                                                      
-	# 링킹된 글로벌데이터 이름을 망가뜨린다. ex) stderr 를 MYSYM_stderr로 바꿔버린다. 심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도댐)
-	# COMMENT:20181116 data섹션에도 stderr가 박혀있고 .bss섹션에도 stderr가 박혀있는경우 재조립할때 동일한심볼이름 참조했다면서 에러남. 그래서 심볼이름에 섹션이름을 녹여넣도록했음. 
+	# 링킹된 글로벌데이터 이름을 망가뜨린다. ex) stderr 를 MYSYM_stderr로 바꿔버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도 된다)
 	logging("now not_global_symbolize_ExternalLinkedSymbol")
 	not_global_symbolize_ExternalLinkedSymbol(resdic)
 
@@ -177,10 +176,6 @@ if __name__=="__main__":
 			if len(resdic['.rodata'].values()[i][0]) != 0: # 만약에 심볼이있다면 데이터처음부분에 INSRTED DATA 를넣자
 				resdic['.rodata'].values()[i][1] = " .byte 0x49, 0x4e, 0x53, 0x45, 0x52, 0x54, 0x45, 0x44, 0x5f\n" + resdic['.rodata'].values()[i][1]
 	
-
-
-
-
 
 
 	# 크래시핸들러 관련 루틴. 구현중
@@ -218,7 +213,6 @@ if __name__=="__main__":
 	logging("Finished generating disassembly file!!!")
 	logging("Lets run Reassemblabla_x86_gencompilescript.py on x86 machine!")
 	logging("")
-
 
 
 	# Select which script to generate!
