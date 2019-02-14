@@ -1,8 +1,5 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-#코드정리.
-#학기시작전까지 
-#
 from capstone import *
 from intelhex import IntelHex
 from elftools.elf.elffile import ELFFile
