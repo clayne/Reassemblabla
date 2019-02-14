@@ -1,15 +1,14 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from capstone import *
-from intelhex import IntelHex
 from elftools.elf.elffile import ELFFile
-import sys 
 import os
 import subprocess
 import re
-from optparse import OptionParser
-import binascii 
+import sys 
+
 from global_variables import *
+
+
 
 def one_operand_instruction(DISASM):
 	if '#' in DISASM:                                   # 주석 제거

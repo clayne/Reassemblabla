@@ -1,17 +1,7 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from capstone import *
-from intelhex import IntelHex
-from elftools.elf.elffile import ELFFile
-import sys 
-import os
-import subprocess
-import re
 from optparse import OptionParser
-import binascii 
 from pwn import *
-from pwnlib.commandline import common
-
 
 from etc import *
 from symbolize import *
@@ -21,7 +11,9 @@ from align import *
 from linkerhandling import *
 from pie_handling import *
 from global_variables import *
-			
+
+
+
 if __name__=="__main__":
 
 	usage = "usage: %prog -f [FILE] <OPTIONS>"

@@ -1,20 +1,14 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 from capstone import *
-from intelhex import IntelHex
-from elftools.elf.elffile import ELFFile
-import sys 
-import os
-import subprocess
-import re
-from optparse import OptionParser
 import binascii 
-import pwn
-from etc import *
-from keystone import *
-from global_variables import *
+from keystone import * 
 from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
+
+from etc import * 
+
+
 
 def bugB(i_op_str):
 	digit = i_op_str.split(', ')[0] # $0xf0

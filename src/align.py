@@ -1,16 +1,8 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from capstone import *
-from intelhex import IntelHex
-from elftools.elf.elffile import ELFFile
-import sys 
-import os
-import subprocess
-import re
-from optparse import OptionParser
-import binascii 
-from global_variables import *
 from etc import *
+
+
 
 def get_alignmentbyte(addr, type):
 	if type == 'data': # Three types of data alignment : 16 byte (SSE instruction), 32 byte (AVX instruction), 64(AVX_512, intel의 특정 cpu line에서만 지원)

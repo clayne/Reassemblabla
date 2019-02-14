@@ -1,17 +1,9 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-import sys 
-import os
-import binascii
-from capstone import *
-from elftools.elf.elffile import ELFFile
-from elftools import *
-from keystone import *
-import pwn
 from binary2dic import *
-from etc import *
 from symbolize import *
-from global_variables import *
+
+
 
 def PIE_set_getpcthunk_loc(resdic):
 	for SectionName in CodeSections_WRITE:

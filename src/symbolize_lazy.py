@@ -1,17 +1,7 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from capstone import *
-from intelhex import IntelHex
-from elftools.elf.elffile import ELFFile
-import sys 
-import os
-import subprocess
-import re
-from optparse import OptionParser
-import binascii 
-
 from etc import *
-from global_variables import *
+from vsa import *
 
 
 

@@ -2,49 +2,39 @@
 #-*- coding: utf-8 -*-
 import re
 
-# TODO: 이름 좀 직관적이게 바꾸기... CodeSection_LIST_WRITE, DataSection_LIST_WRITE
+# 섹션 선언
 CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.plt.got','.plt']
 DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata','.got.plt'] # <.jcr> added for handling pie binary.
 AllSections_WRITE  = CodeSections_WRITE + DataSections_WRITE
 
-MyNamedSymbol = ['main', '__x86.get_pc_thunk']
-
+# 아래 섹션들은 text/data 섹션으로써 디스어셈블리에 쓰인다
 TreatThisSection2TEXT = ['.init','.fini', '.ctors', '.dtors', '.plt.got', '.plt']
 TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got', '.got.plt']
 
-DoNotWriteThisSection = [] # 걍 다 써줘봐봐우선. 
+# 네임드 심볼을 지정
+MyNamedSymbol = ['main', '__x86.get_pc_thunk']
 crts = "/usr/lib/i386-linux-gnu/crtn.o "
+
+# 우선 모든섹션 다 써준다. 
+DoNotWriteThisSection = [] 
+# 심볼의 프리픽스
 SYMPREFIX = ['']
 
+# 레지스터
 GENERAL_REGISTERS = ['%eax', '%ebx', '%ecx', '%edx', '%edi', '%esi', '%ebp', '%esp', '%eip']
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # global regex
 _ = '.*?'
-REG1REF = _ + '(0x)?' + '[0-9a-f]+' +  _ + '%' + _  	# 0x12(%ebx)
-REG    = _ + '%' + _ 						   	   		# %eax
-IMM    = _ + '(\$)' + '(0x)?' + '[0-9a-f]+' + _   		# $0x123. TODO: 앞에원래 '(\$)?' 였는데 IMM값은 $가 꼭 있어야해서 수정해줬음. 뭔가 문제생길시 의심해보자. 
+REG1REF = _ + '(0x)?' + '[0-9a-f]+' +  _ + '%' + _  	# ex) 0x12(%ebx)
+REG    = _ + '%' + _ 						   	   		# ex) %eax
+IMM    = _ + '(\$)' + '(0x)?' + '[0-9a-f]+' + _   		# ex) $0x123. 
 RM32 = {}
 
-# Memory reference
+# 메모리 레퍼런스값
 RM32['M_REG']    = _ + '[(]' + _ + '%' + _ + '[)]' + _ 		# R이긴 한데 메모리레퍼런스에 쓰이는 R (%eax) / (%eax, %ebx, 4)
 RM32['M_HEX']    = _ + '(0x)?' + '[0-9a-f]+' + _ 			# M32. 0x1234
-# Just register...
-RM32['R_REG']        = REG	
+RM32['R_REG']        = REG									# 단지 그냥 레지스터
 
 # 근데 사실 RM32['M']  는 쓸모없는게, 왜냐면 애초에 이러케 헥스값으로다가 생겨먹은얘들은 symbolize단계에서 다 심볼화된상태이기때문임. 
 p_cmp = []
@@ -248,8 +238,7 @@ p_PATTERN_04.append(re.compile(' div'   + RM32['M_REG']))
 p_PATTERN_04.append(re.compile(' idiv'  + RM32['M_REG']))
 p_PATTERN_04.append(re.compile(' imul'  + RM32['M_REG']))
 p_PATTERN_04.append(re.compile(' inc'   + RM32['M_REG']))
-# p_PATTERN_04.append(re.compile(' jmp'   + RM32['M_REG']))
-p_PATTERN_04.append(re.compile(' j'     + RM32['M_REG'])) # j의 프랜드들을 고려안했네에,,,
+p_PATTERN_04.append(re.compile(' j'     + RM32['M_REG'])) # jmp, jne, je...
 p_PATTERN_04.append(re.compile(' mul'   + RM32['M_REG']))
 p_PATTERN_04.append(re.compile(' neg'   + RM32['M_REG']))
 p_PATTERN_04.append(re.compile(' not'   + RM32['M_REG']))
@@ -266,7 +255,7 @@ p_PATTERN_04R.append(re.compile(' div'   + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' idiv'  + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' imul'  + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' inc'   + RM32['R_REG']))
-p_PATTERN_04R.append(re.compile(' j'     + RM32['R_REG'])) # jmp 관련된것들
+p_PATTERN_04R.append(re.compile(' j'     + RM32['R_REG'])) # jmp, jne, je...
 p_PATTERN_04R.append(re.compile(' mul'   + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' neg'   + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' not'   + RM32['R_REG']))
@@ -278,10 +267,9 @@ p_PATTERN_04R.append(re.compile(' shl'   + RM32['R_REG']))
 p_PATTERN_04R.append(re.compile(' shr'   + RM32['R_REG']))
 
 
-# 0-operand instruction. TODO: 뒤에뭐 주석빼고는 아무것도 안붙어야할텐데.(아냐 절레절레. ret 0x10이런것만 보더라도 붙자나,,크흑 결과가 달라진다구우.) [주석 or notthing] 에 관한 regex 만들자
-# 이걸로인해서 레지스터 중 뭔가가 달라지는 경우가 있을까?ㅎㅅㅎ 그런경우, 에뮬레이션하는것들중 del 을 해줘야지..
-# 알아내려면 하나하나 실험해야 하는데... 그럴만한 가치가 있을까?ㅎㅅㅎ
-# 없을거같애. 하지말자그냥
+# 0-operand instruction. 
+# TODO: 이 뒤에 무언가가 붙는 경우도 핸들링할 수 있도록 룰을 마련하기 ex) ret 0x10
+# TODO: 이 연산결과 레지스터값이 달라지는 경우, 에뮬레이션하는것들 중 del 해주기
 p_PATTERN_05.append(re.compile(' cbw'      ))
 p_PATTERN_05.append(re.compile(' cwde'     ))
 p_PATTERN_05.append(re.compile(' clc'      ))
@@ -393,25 +381,12 @@ p_PATTERN_INFORMATION_LOSS = []
 # 이렇게 register 값을 변경하는 인스트럭션 모아보기.
 
 
-
-
-
-
-
-
-
-
-
-# c9x에서 lea페이지를 보면서 깨달은게 m도 실제적으로는 REG1REF를 의미한다는걸 알았음. m 은 MYSYM이 될수도, 0x123(%eax) 이 될수도 있다. 
-
-
-
 # 원래있던것
 p_add     = re.compile(' add' + IMM + REG)                     # add $0x1b53, %ebx
 p_sar     = re.compile(' sar' + IMM + REG)                     # sar $0x2, %ebx
-p_lea     = re.compile(' lea' + RM32['M_REG'] + REG)                  # leal.d32 -3(%ebx), %eax
-p_mov     = re.compile(' mov' + RM32['M_REG'] + REG)                  # movl.d32 -3(%ebx), %eax
+p_lea     = re.compile(' lea' + RM32['M_REG'] + REG)           # leal.d32 -3(%ebx), %eax
+p_mov     = re.compile(' mov' + RM32['M_REG'] + REG)           # movl.d32 -3(%ebx), %eax
 p_xor     = re.compile(' xor' + REG + REG)                     # xorl %edi, %edi
-p_push    = re.compile(' push' + RM32['M_REG'])                       # pushl.d32 -0xc(%ebx)          
+p_push    = re.compile(' push' + RM32['M_REG'])                # pushl.d32 -0xc(%ebx)          
 p_call    = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
 p_bracket = re.compile('\<.*?\>')

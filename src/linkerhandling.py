@@ -1,24 +1,7 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-from capstone import *
-from intelhex import IntelHex
-from elftools.elf.elffile import ELFFile
-import sys 
-import os
-import subprocess
-import re
-from optparse import OptionParser
-import binascii 
-
 from binary2dic import *
 from global_variables import *
-
-def lfunc_remove_pseudoinstruction(dics_of_text):
-	# eiz 를 포함하는 모든 인스트럭션은 그냥 nop 으로 바꾼다
-	for i in range(0,len(dics_of_text)):
-		key = dics_of_text.keys()[i]
-		if "eiz" in dics_of_text.values()[i][1][0]: 
-			dics_of_text[key][1][0] = " nop"
 
 
 
@@ -61,10 +44,8 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 	# plt 로써 어떤섹션을 참조할지 결정한다.
 	if CHECKSEC_INFO.relro == 'Full': 
 		VIA = '.plt.got'
-		# TABLE  = RELO_TABLES['.rel.dyn'] 
 	else:
 		VIA = '.plt'
-		# TABLE  = RELO_TABLES['.rel.plt']
 	TABLE = RELO_TABLES
 
 	# GOT 테이블의 베이스 어드레스를 구해온다. 
@@ -85,11 +66,11 @@ def lfunc_revoc_linking(resdic, CHECKSEC_INFO , RELO_TABLES):
 						if GOT_addr_of_func[j] in resdic[VIA].keys(): # 3STEP LANDING : .text -> .plt.got -> .rel.dyn 
 							HEXFINAL = extract_hex_values(resdic[VIA][GOT_addr_of_func[j]][1][0]) # .plt.got에서 jmp *0x8049ff4 하는 대상주소
 							if len(HEXFINAL) < 1:
-								"언급된 HEX 값이 우연히 VIA 중간을 찍는 값인경우, VIA 의 disassembly가 nop(66 90)일 경우가 많다. 구럼헥스값없징."
+								"언급된 HEX 값이 우연히 VIA 중간을 찍는 값인경우, VIA 의 disassembly가 nop(66 90)일 경우가 있음 "
 							else:
-								HEXFINAL[0] = HEXFINAL[0] + _GLOBAL_OFFSET_TABLE_ # "어쩌구" + Got base address
+								HEXFINAL[0] = HEXFINAL[0] + _GLOBAL_OFFSET_TABLE_ 
 								if HEXFINAL[0] in TABLE.keys():
-									name = TABLE[HEXFINAL[0]]  # TODO: now handling..lib_addr 가 TABLE 에 없는경우가 있음. (<= 얘 뭐라는거냐? )
+									name = TABLE[HEXFINAL[0]] 
 									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j]),name)
 									DISASSEMBLY = DISASSEMBLY.replace(hex(GOT_addr_of_func[j])[2:],name)
 									resdic['.text'][ADDRESS][1][0] = DISASSEMBLY

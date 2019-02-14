@@ -1,8 +1,6 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
-
 from capstone import *
-from intelhex import IntelHex
 from elftools.elf.elffile import ELFFile
 import sys 
 import os
