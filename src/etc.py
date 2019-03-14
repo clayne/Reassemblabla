@@ -9,6 +9,10 @@ import sys
 from global_variables import *
 
 
+def symbolize_counter(theString):
+	f = open('log','a+')
+	f.write(theString + '\n')
+	f.close()
 
 def one_operand_instruction(DISASM):
 	if '#' in DISASM:                                   # 주석 제거
@@ -204,6 +208,43 @@ def there_is_memory_reference(line):
 		return True
 	else:
 		return False
+
+def extract_hex_addr(line):
+	'''
+	- extract every hex value from 1 line
+	- ex)
+		mov    0x20804,%al               --> [20804] --> [133124]
+		je     804841b <frame_dummy+0xb> --> [804841b] --> [134513691]
+		push   $0x8048540                --> [8048540] --> [134513984]
+	'''
+	# list1 = re.findall(r'[0-9a-f]+', line) <- 예전코드인데, 어떤 스트링라인 "123 add fdfd qqdq" 에서 123, add,fdfd, d 를 추출하여 리스트로 리턴한다
+	line = line.replace(',',' ').replace('(',' ').replace(')',' ')
+	line = re.sub('\s+',' ',line).strip() # duplicate space, tab --> single space
+	line = line.split(' ')[1:] # opcode 제거 
+
+	addrlist = []
+	for i in xrange(len(line)):
+		if line[i].startswith('%'): # 레지스터라면.. 그냥 넘겨라
+			continue
+		elif len(line[i]) == 0: # 쓸모없는거라면 넘겨라
+			continue
+
+		else:
+			line[i] = line[i].replace('0x','')
+			line[i] = line[i].replace('*', '')
+			line[i] = line[i].replace('$', '') 
+			if line[i] == '': # 전처리 후 나온 line 이 '' 이라면 패스 
+				continue 
+			if line[i][0] == '-': # 음수라면
+				if len(line[i])>1 and ishex(line[i][1:]): # 그게 헥스값이라면 
+					addrlist.append(-int('0x'+line[i][1:],16))	
+
+			else: # 양수라면 
+				if ishex(line[i]): 
+					addrlist.append(int('0x'+line[i],16)) 
+
+	return addrlist
+
 
 
 def list_insert(position, list1, list2):
@@ -481,7 +522,7 @@ def gen_compilescript(LOC, filename, testingcrashhandler):
 		# cmd += "-Wl,--section-start=.dynsym=0x09000000 " #TODO: 이게 정석임. 이걸 어떻게든 고쳐서쓰는게 정석인데, 그냥 지금은 귀찮아서 pie옵션으로 땜빵하는 중. 
 		cmd += " -pie "
 
-	cmd += "-g -o "
+	cmd += "-o "
 	cmd += onlyfilename + "_reassemblable "
 	cmd += onlyfilename + "_reassemblable.s "
 	cmd += "-m32 "

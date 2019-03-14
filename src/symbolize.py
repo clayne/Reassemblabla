@@ -68,8 +68,9 @@ def getpcthunk_labeling(resdic):
 					j += 1
 	return 	list(set(pcthunk_reglist)) # 중복 제거
 
-def symbolize_textsection(resdic):
+def symbolize_textsection(resdic, testingcrashhandler):
 	symbolcount = 0	
+	symbolize_count = 0
 	for section_from in CodeSections_WRITE:
 		for section_to in AllSections_WRITE:
 			if section_from in resdic.keys() and section_to in resdic.keys():
@@ -78,9 +79,13 @@ def symbolize_textsection(resdic):
 					orig_i_list = pickpick_idx_of_orig_disasm(resdic[section_from][ADDR][1])
 					for orig_i in orig_i_list:
 						DISASM = resdic[section_from][ADDR][1][orig_i]
-						destinations = VSA_and_extract_addr(DISASM) 
+						if testingcrashhandler is True:
+							destinations = VSA_and_extract_addr(DISASM) 
+						else:
+							destinations = extract_hex_addr(DISASM)
 						for DEST in destinations: 
 							if DEST in resdic[section_to].keys(): 
+								symbolize_count += 1
 								# 심볼이름셋팅
 								if resdic[section_to][DEST][0] != "": # if symbol already exist
 									simbolname = resdic[section_to][DEST][0][:-1] # MYSYM1: --> MYSYM1
@@ -90,6 +95,7 @@ def symbolize_textsection(resdic):
 									resdic[section_to][DEST][0] = simbolname + ":"
 								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
 								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST)[2:],simbolname) # 그게아니라 12 이렇게생겼을경우 12 --> MYSYM_1 치환 (그럴리는없겠지만..)
+	symbolize_counter('Symbolize (textsection) : {}'.format(symbolize_count))
 	return resdic
 
 def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize. 
@@ -101,6 +107,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 	_from = DataSections_WRITE     
 	_to   = AllSections_WRITE
 	symcnt = 0
+	symbolize_count = 0
 	for section_from in _from:
 		if _from == '.bss':# bss에는 아무것도 안들어있자나..
 			continue
@@ -122,6 +129,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 									candidate = candidate.replace(' .byte 0x','')
 									candidate = "0x"+candidate
 									if int(candidate,16) in resdic[section_to].keys(): # to 의 대상이되는 섹션
+										symbolize_count += 1
 										symbolname = resdic[section_to][int(candidate,16)][0]
 										if symbolname == '': 
 											symbolname = SYMPREFIX[0] + "MYSYM_DATA_"+str(symcnt)+":"
@@ -140,6 +148,7 @@ def symbolize_datasection(resdic): # datasection --> datasection 을 symbolize.
 					else:
 						"do nothing"
 					i = i + 1 
+	symbolize_counter('Symbolize (datasection) : {}'.format(symbolize_count))
 	return resdic
 
 
@@ -195,4 +204,15 @@ def lfunc_change_callweirdaddress_2_data(dics_of_text):
 							line_data += '0x' + bytepattern[j*2:j*2+2] + ', '
 						line_data = line_data[:-2]
 						dics_of_text[ADDR][1][orig_i] = line_data
+
+
+
+
+
+
+
+
+
+
+
 

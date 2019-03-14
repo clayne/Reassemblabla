@@ -24,9 +24,11 @@ def PIE_set_getpcthunk_loc(resdic):
 				SectionDic[SORTED_ADDRESS[i]][3] = EIP 
 
 
-def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
+# emulation
+def emulation(resdic, testingcrashhandler):
 	count = 0
-	
+	symbolizebyemulation = 0
+
 	for sectionName_1 in CodeSections_WRITE:
 		if sectionName_1 not in resdic.keys(): 
 			continue # 섹션이 없는경우
@@ -52,6 +54,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 					print "╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮"
 					print "│ [{}] {} : {}".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + "---{}---> {} [[[START]]]".format(REG_STHX,hex(reg[REG_STHX])).ljust(40) + '│'
 					slice_count += 1
+					symbolizebyemulation += 1
 					stepSlice = 'keep going'
 
 					while 1: # 코드 슬라이싱 시작	 
@@ -69,6 +72,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 							print "╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮"
 							print "│ [{}] {} : {}".format(slice_count,hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + "---{}---> {} [[[START]]]".format(REG_STHX,hex(reg[REG_STHX])).ljust(40) + '│'
 							slice_count += 1
+							symbolizebyemulation += 1
 							stepSlice = 'keep going' # 셋팅 다해주고는 플래그를 다시 바꿔준다.
 
 						i += 1 # 다음 인스트럭션 처리로 넘어간다
@@ -92,7 +96,14 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 							if DISASM.startswith(' call'):
 								stepSlice = 'this is last slice. after process it, stop slicing'
 								# break
-							
+
+							_pass = 'no'
+							for _segmentinstruction in segmentinstr: # 세그먼트 레지스터 관련한 인스트럭션이라면 심볼화하지 않는다.
+								if DISASM.startswith(_segmentinstruction) or DISASM.startswith(' '+_segmentinstruction):
+									_pass = 'yes' # 다음 DISASM 처리로 넘어간다
+							if _pass is 'yes':
+								continue
+
 							hit_pattern = 'NO'
 
 							# 크래시핸들러 기반 디자인이 아닐 경우에만 get_pc_thunk 이후의 add $0x1234, %eax 는 add $_GLOBAL_OFFSET_TABLE_, %eax 으로 바꿔준다.  
@@ -113,6 +124,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 								
 								print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]), DISASM).ljust(70) + "--------->{}".format(NEWDISASM).ljust(40) + '│'
 								slice_count += 1
+								symbolizebyemulation += 1
 								continue # 처리끝. 다음 DISASM 처리로 넘어간다. 
 
 							for pattern in p_PATTERN_01: # 인스트럭션 + REG + REGREF  // mov %eax, -3(%ebx)
@@ -239,6 +251,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 										# 심볼라이즈 
 										print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + ".......... Destination is {}".format(hex(DESTINATION)).ljust(40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 										for sectionName_2 in resdic.keys():
 											if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
@@ -329,6 +342,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 										for _r in reg.keys():
 											print "│ {} : ".format(_r).rjust(70, ' ') + "{}".format(hex(reg[_r])).ljust(40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 									
 
@@ -465,6 +479,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 										# SOURCE OPERAND 를 심볼라이즈 
 										print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + ".......... Destination is {}".format(hex(DESTINATION)).ljust(40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 										for sectionName_2 in resdic.keys():
 											if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
@@ -621,6 +636,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 											for _r in reg.keys():
 												print "│ {} : ".format(_r).rjust(70, ' ') + "{}".format(hex(reg[_r])).ljust(40) + '│'
 											slice_count += 1
+											symbolizebyemulation += 1
 										
 										found_target = 0
 
@@ -769,6 +785,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 
 										print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + ".......... Destination is {}".format(hex(DESTINATION)).ljust(40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 										for sectionName_2 in resdic.keys():
 											if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
@@ -941,6 +958,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 											# lea MYSYM, %eax 이런식으로 수정해줌.
 											print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + ".......... Destination is {}".format(hex(DESTINATION)).ljust(40) + '│'
 											slice_count += 1
+											symbolizebyemulation += 1
 											found_target = 0
 											for sectionName_2 in resdic.keys():
 												if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
@@ -1069,6 +1087,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 										# 심볼라이즈 
 										print "│ [{}] {} : {}".format(slice_count, hex(SORTED_ADDRESS[i]),DISASM).ljust(70) + ".......... Destination is {}".format(hex(DESTINATION)).ljust(40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 										for sectionName_2 in resdic.keys():
 											if DESTINATION in resdic[sectionName_2].keys() and sectionName_2 in AllSections_WRITE:
@@ -1088,6 +1107,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 											resdic[sectionName_1][SORTED_ADDRESS[i]][1][orig_j] = NEWDISASM
 											resdic[sectionName_1][SORTED_ADDRESS[i]][3] = REGLIST['REFERENCE_REGISTER'] # TODO: 위와 동일
 											print "│                 {}".format(NEWDISASM).ljust(70) + ".......... memorizing {}".format(resdic[sectionName_1][SORTED_ADDRESS[i]][3]).ljust(40) + '│'
+
 							for pattern in p_PATTERN_04R: # 인스트럭션 + REG // call %eax
 								if hit_pattern == 'HIT':
 									break
@@ -1225,6 +1245,7 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 										for _r in reg.keys():
 											print "│ {} : ".format(_r).rjust(70, ' ') + "{}".format(hex(reg[_r])).ljust(70+40) + '│'
 										slice_count += 1
+										symbolizebyemulation += 1
 										found_target = 0
 
 										if found_memory_reference == 1: 
@@ -1258,11 +1279,12 @@ def PIE_calculated_addr_symbolize(resdic, testingcrashhandler):
 					print "╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 					print ""
 
+	symbolize_counter("emulation : {}".format(symbolizebyemulation))
 
-
-
-def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):  
+# emulation_got
+def emulation_got(pcthunk_reglist, resdic, CHECKSEC_INFO):  
 	# The Ultimate REGEX!
+	symbolizebyemulation = 0
 	_ = '.*?'
 	p_lea   = re.compile(' lea' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # ex) leal.d32 -3(%ebx), %eax
 	p_mov   = re.compile(' mov' + _ + ' ' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)          # ex) movl.d32 -3(%ebx), %eax
@@ -1374,13 +1396,16 @@ def PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic, CHECKSEC_INFO):
 								print '│                 {}'.format(NEWDISASM).ljust(110) + '│'
 								print "╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 								print ''
+								symbolizebyemulation += 1
+
+	symbolize_counter("emulation_got : {}".format(symbolizebyemulation))
 
 					
-
 # pie 바이너리같은경우 .plt.got 의 항이 jmp *0x12341234 이게아니라 jmp *0xc(%ebx) 이렇게 생겼다. (이때 %ebx는 항상 GOT의 시작주소이므로 휴리스틱하게 대상 주소를 구할 수 있다는점을 이용)  
-def PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic):
+def emulation_pltfix(CHECKSEC_INFO, resdic):
 	_ = '.*?'
 	p_jmp   = re.compile(' jmp' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + '\(%' + _ + '\)') # jmpl.d32 *0xc(%ebx)
+	symbolizebyemulation = 0
 
 	if '.plt.got' in resdic.keys() or '.plt' in resdic.keys(): 
 		# relro 방식에 따라 GOT baseaddress가 다르다. PLT_sectionName 도 다르다. 
@@ -1408,13 +1433,12 @@ def PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic):
 		
 					NEWDISASM = ' ' + INSTRUCTION + ' ' + '*' + str(hex(DESTINATION))
 		
-					print SectionDic[SORTED_ADDRESS[i]][1][orig_i]
-					print NEWDISASM
-					print ''
-		
+					
 					SectionDic[SORTED_ADDRESS[i]][1][orig_i] = NEWDISASM
 					SectionDic[SORTED_ADDRESS[i]][3]         = REGLIST[0] # TODO: [3] 에다가 소거한 레지스터 저장. 위와 동일하게 형식 통일해야함.
-			
+					symbolizebyemulation += 1
+	symbolize_counter('emulation_pltfix : {}'.format(symbolizebyemulation))
+
 
 def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 	for SectionName in resdic.keys():
@@ -1424,12 +1448,6 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 				if 'REGISTER_WHO' in resdic[SectionName][ADDR][1][orig_i]:
 					
 					if orig_i == -1: continue
-					print "------------------------------------REGISTER_WHO------------------------------------"
-					print hex(ADDR)
-					print ''
-	
-					for kkk in resdic[SectionName][ADDR][1]:
-						print kkk
 	
 					# 우선은 리플레이스해주고
 					eliminated_register_name = ''
@@ -1450,9 +1468,6 @@ def fill_blanked_symbolname_toward_GOTSECTION(resdic):
 	
 					resdic[SectionName][ADDR][1] = list_insert(orig_i+1, resdic[SectionName][ADDR][1], CODEBLOCK_2)
 					resdic[SectionName][ADDR][1] = list_insert(orig_i, resdic[SectionName][ADDR][1], CODEBLOCK_1)
-					print ''
-					for kkk in resdic[SectionName][ADDR][1]:
-						print kkk
 					
 
 def addRoutineToGetGLOBALOFFSETTABLE_in_init_array(resdic):

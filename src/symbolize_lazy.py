@@ -18,11 +18,17 @@ def symbolize_alllines(resdic):
 
 def setup_some_useful_stuffs_for_crashhandler(resdic): # 레지스터 백업함수를 셋업한다.
 	asm_stuffs = '''
-.lcomm MYSYM_EIP, 4 #!!!
-.lcomm MYSYM_ESP, 4 #!!! 
+.lcomm MYSYM_EIP, 4 
+.lcomm MYSYM_EXITADDR, 4
+.lcomm MYSYM_ESP, 4 
+.lcomm MYSYM_STACKLOC, 4
 .lcomm MYSYM_CRASHADDR, 4
 .lcomm MYSYM_CRASHADDR_R, 4 
+.lcomm MYSYM_CRASHADDR_LEFT, 4
+.lcomm MYSYM_CRASHADDR_RIGHT, 4
+
 .lcomm MYSYM_LIBFLAG, 4
+.lcomm MYSYM_DUMMY, 4
 
 .lcomm MYSYM_EFLAGS, 4
 .lcomm MYSYM_EAX, 4
@@ -62,10 +68,13 @@ MYSYM_restoreregistercontext:
 	asm_exit = '''
 #+++++
 # crash handler 를 거쳐서도 해결안되는 심볼.. 즉, 애초부터 세그폴의 운명이였던 놈은 이곳으로 탈출해라.....
-MYSYM_EXIT:
-	movl $0x1, %eax
-	movl $0x3, %ebx
-	int $0x80
+MYSYM_EXIT: 
+	# movl $0x1, %eax
+	# movl $0x3, %ebx
+	# int $0x80
+	mov MYSYM_EXITADDR, %eax
+	mov %eax, 0xdc(%esp)              
+	ret 	
 '''
 
 	noaddr = 0xf0000000
@@ -133,6 +142,99 @@ def addRoutineToInstallSignalHandler_in_init_array(resdic):
 											'']
 
 
+
+def piece_asm_block(addr, nextpiecename, count, symbolname):
+	isitgotbased = 'no'
+	if 'REGISTER_WHO' in symbolname:
+		symbolname = symbolname.replace('REGISTER_WHO','%edx') # 이제 _progname@GOT(%edx) 으로바꾼당. 
+		isitgotbased = 'yes'
+
+	# 소비한 레지스터 : eax ebx ecx (이것빼고 다 써도 됨)
+	asm_block  =  		'' + ''
+	asm_block  += 		'#+++++'										+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmp $%s, %%eax'								+ ' ' + '#+++++' + '\n'	# %eax : 크래시 유발 주소
+	asm_block  += 		' jne %s'										+ ' ' + '#+++++' + '\n'	
+	asm_block  += 		' cmp $0x1, MYSYM_LIBFLAG' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' jne MYSYM_CRASHHANDLER_ORIG_%s' 				+ ' ' + '#+++++' + '\n' 
+	
+	# 라이브러리 크래시 - 스택 픽싱
+ 	asm_block  += 		' mov MYSYM_ESP, %%ebx'							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' sub $0x4, %%ebx'								+ ' ' + '#+++++' + '\n'
+	asm_block  +=  		' mov $0x200, %%ecx'							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		'MYSYM_CRASHHANDLER_LIB_%s: '					+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' dec %%ecx'									+ ' ' + '#+++++' + '\n' # 카운터 감소(0 == 스택에 크래시유발값이 없는경우)
+	asm_block  += 		' jz MYSYM_CRASHHANDLER_LIB_REG_%s'				+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' add $0x4, %%ebx'								+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmp %%eax, (%%ebx)' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' jne MYSYM_CRASHHANDLER_LIB_%s' 				+ ' ' + '#+++++' + '\n'
+	if isitgotbased == 'yes':
+		asm_block += 	' mov MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %%edx' + ' ' + '#+++++' + '\n' # _progname@GOT(%edx) 참조하다가 난 경우 
+	asm_block  += 		' lea %s, %%eax'								+ ' ' + '#+++++' + '\n' 
+	asm_block  += 		' mov %%eax, (%%ebx)'							+ ' ' + '#+++++' + '\n' # Stack Fixing
+	asm_block  += 		' mov MYSYM_EIP, %%eax'							+ ' ' + '#+++++' + '\n' # 컴백할 주소를 sc.eip 자리에셋팅후 sigreturn 
+	asm_block  += 		' mov %%eax, 0xdc(%%esp)'						+ ' ' + '#+++++' + '\n'             
+	asm_block  += 		' ret'											+ ' ' + '#+++++' + '\n'				
+	
+	# 일반 메모리참조 크래시 - MYSYM_CRASHADDR 픽싱
+	asm_block  += 		'MYSYM_CRASHHANDLER_ORIG_%s:'					+ ' ' + '#+++++' + '\n'
+	if isitgotbased == 'yes':
+		asm_block += 	' mov MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_, %%edx' + ' ' + '#+++++' + '\n' #  _progname@GOT(%edx) 참조하다가 난 경우 
+	asm_block  += 		' lea %s, %%eax'								+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%eax, MYSYM_CRASHADDR'					+ ' ' + '#+++++' + '\n' 
+	asm_block  += 		' mov MYSYM_EIP, %%eax'							+ ' ' + '#+++++' + '\n' #  컴백할 주소를 sc.eip 자리에셋팅후 sigreturn
+	asm_block  += 		' mov %%eax, 0xdc(%%esp)'						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' ret'											+ ' ' + '#+++++' + '\n'
+	
+	# 레지스터 값들 중 하나가 크래시의 원인 - MYSYM_REG 픽싱
+	asm_block  += 		'MYSYM_CRASHHANDLER_LIB_REG_%s:'				+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' lea %s, %%esi'								+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' lea MYSYM_DUMMY, %%edi'						+ ' ' + '#+++++' + '\n'  
+	
+	asm_block  += 		' mov $MYSYM_EAX, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_EAX' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+	
+	asm_block  += 		' mov $MYSYM_EBX, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_EBX' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov $MYSYM_ECX, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_ECX' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov $MYSYM_EDX, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_EDX' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov $MYSYM_EDI, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_EDI' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov $MYSYM_ESI, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_ESI' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov $MYSYM_EBP, %%edx' 						+ ' ' + '#+++++' + '\n'  # edx는 edi의 candidate
+	asm_block  += 		' cmp %%eax, MYSYM_EBP' 						+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' cmove %%edx, %%edi' 							+ ' ' + '#+++++' + '\n'
+	asm_block  += 		' mov %%esi, (%%edi)' 							+ ' ' + '#+++++' + '\n'
+
+	asm_block  += 		' mov MYSYM_EIP, %%eax'							+ ' ' + '#+++++' + '\n' # 컴백할 주소를 sc.eip 자리에셋팅후 sigreturn 
+	asm_block  += 		' mov %%eax, 0xdc(%%esp)'						+ ' ' + '#+++++' + '\n'             
+	asm_block  += 		' ret'											+ ' ' + '#+++++' + '\n'				
+
+
+	return asm_block % (str(hex(addr)), nextpiecename, str(count), str(count), str(count), str(count), symbolname, str(count), symbolname, str(count), symbolname)
+
+
+
 def setupsignalhandler(resdic):
 	CRASHHANDLER = {}
 
@@ -141,33 +243,6 @@ def setupsignalhandler(resdic):
 
 	# asm_prifix = ' mov MYSYM_CRASHADDR, %eax' 		+ ' ' + '#+++++' + '\n' # 크래시유발한 바로 그 주소값을 %eax 에다가 집어넣는다 COMMENT: 이거 외부라이브러리에서 크래시나면 무슨값을참조하다났는지 스택으로만 알수있기때문에 우선 스택을 쓰도록 했음.
 	asm_prifix = ' mov 0x1c(%esp), %eax'			+ ' ' + '#+++++' + '\n'
-
-	asm_block  = '' + ''
-	asm_block  += '#+++++'							+ ' ' + '#+++++' + '\n'
-	asm_block  += ' cmp $%s, %%eax'					+ ' ' + '#+++++' + '\n'	# 1. if 원본바이너리의 주소와 같다면 
-	asm_block  += ' jne %s'							+ ' ' + '#+++++' + '\n'	# 
-
-	# 이꼴인 상태지?? 현재 %eax(오리지널주소), %s(새주소의심볼)이 이써.
-	asm_block  += ' cmp $0x1, MYSYM_LIBFLAG' 		+ ' ' + '#+++++' + '\n' # 2. 라이브러리 내부에서 크래시가 났다면
-	asm_block  += ' jne MYSYM_CRASHHANDLER_ORIG_%s' + ' ' + '#+++++' + '\n' # 
-	asm_block  += ' mov MYSYM_ESP, %%ebx'			+ ' ' + '#+++++' + '\n'
-	asm_block  += ' sub $0x4, %%ebx'				+ ' ' + '#+++++' + '\n'
-	asm_block  += 'MYSYM_CRASHADDR_LIB_%s: '		+ ' ' + '#+++++' + '\n' # 	loop
-	asm_block  += ' add $0x4, %%ebx'				+ ' ' + '#+++++' + '\n' # 
-	asm_block  += ' cmp %%eax, (%%ebx)' 			+ ' ' + '#+++++' + '\n' # 	오지리널주소 %%eax와 스택안에저장된주소(%%ebx) 비교
-	asm_block  += ' jne MYSYM_CRASHADDR_LIB_%s' 	+ ' ' + '#+++++' + '\n' #  
-	asm_block  += ' lea %s, %%eax'					+ ' ' + '#+++++' + '\n' # 	일치한다면 스택교정
-	asm_block  += ' mov %%eax, (%%ebx)'				+ ' ' + '#+++++' + '\n' # 	
-	asm_block  += ' mov MYSYM_EIP, %%eax'			+ ' ' + '#+++++' + '\n' #   컴백할 주소를 sc.eip 자리에셋팅후 sigreturn 
-	asm_block  += ' mov %%eax, 0xdc(%%esp)'			+ ' ' + '#+++++' + '\n' #              
-	asm_block  += ' ret'							+ ' ' + '#+++++' + '\n'	# 			
-
-	asm_block  += 'MYSYM_CRASHHANDLER_ORIG_%s:'		+ ' ' + '#+++++' + '\n' # 3. 바이너리 내부에서 크래시가 났다면
-	asm_block  += ' lea %s, %%eax'					+ ' ' + '#+++++' + '\n' #    새 주소를 MYSYM_CRASHADDR 에다가 셋팅해준 후
-	asm_block  += ' mov %%eax, MYSYM_CRASHADDR'		+ ' ' + '#+++++' + '\n'	#  
-	asm_block  += ' mov MYSYM_EIP, %%eax'			+ ' ' + '#+++++' + '\n' #    컴백할 주소를 sc.eip 자리에셋팅후 sigreturn
-	asm_block  += ' mov %%eax, 0xdc(%%esp)'			+ ' ' + '#+++++' + '\n' #              
-	asm_block  += ' ret'							+ ' ' + '#+++++' + '\n'	# 			 
 	
 	# 바이너리내부용 크래시핸들러
 	CRASHHANDLER[addr_crashhandler] = [
@@ -188,14 +263,14 @@ def setupsignalhandler(resdic):
 				nextpiecename = SYMPREFIX[0] + 'MYSYM_CRASHHANDLER_' + str(count + 1)
 				CRASHHANDLER[addr_crashhandler] = [
 									  'MYSYM_CRASHHANDLER_' + str(count) + ':', 		# resolver의 각 항은 jne linked list 로 이어져 있다. 
-									  [asm_block % (str(hex(addr)), nextpiecename, str(count), str(count), str(count), symbolname, str(count), symbolname)],
+									  [piece_asm_block(addr, nextpiecename, count, symbolname)],
 									  '', 												# 주석자리. 노필요
 									  ''  												# PIE관련정보 자리. 노필요.
 									  ]
 				addr_crashhandler += 1
 				count += 1
 	
-	CRASHHANDLER[addr_crashhandler] = [													# 크래시핸들러 링크의 끝 : 자살!
+	CRASHHANDLER[addr_crashhandler] = [													# 크래시핸들러 링크의 끝 : 자살! URGENT: 이거를 그냥 마지막에는 MYSYM_EIP 로 리턴하도록 디자인하면 어떨까?
 						  'MYSYM_CRASHHANDLER_' + str(count) + ':', 	
 						  ['jmp MYSYM_EXIT #+++++'],
 						  '',
@@ -205,7 +280,158 @@ def setupsignalhandler(resdic):
 	
 
 
-def add_someprefix_before_all_memory_reference(resdic):
+
+
+def symbolize_crashhandler_allmemref(resdic): # TODO: lea __procname@GOT(REGISTER_WHO), %eax 이거 앞에 MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_ 사용하도록 고칠 것. 
+	_ = '.*?'
+	count = 0
+
+	SORTEDADDR = sorted(resdic['.text'])
+	for i in xrange(len(resdic['.text'].keys())):
+		addr = SORTEDADDR[i]
+		origindexlist = pickpick_idx_of_orig_disasm(resdic['.text'][addr][1]) 
+		for j in reversed(origindexlist):
+			DISASM = resdic['.text'][addr][1][j]
+			if 'Prefix added' in DISASM: # 이미 다른 함수에서 프리픽스가 추가된 상태임...
+				continue
+			if '#' in DISASM: # 주석떼버리기
+				DISASM = DISASM[:DISASM.index('#')] 
+			MEMREF = p_PATTERN_MEMREF_REGISTER.search(DISASM) # 1. 0x12(%eax,%ebx,4) 객체를 찾는다. 
+			
+			_ = p_PATTERN_SEGMENTREGISTER.findall(DISASM) # COMMENT: 20190217: 위의 메모리패턴 regex가 %ds:(%eax) 도 처리해주는바람에 예외처리함. 
+			if len(_) is not 0:
+				continue
+
+
+
+
+			# [01] 거르는 인스트럭션
+			itisbranch = False
+			if DISASM.startswith('j') or DISASM.startswith(' j') or DISASM.startswith('call') or DISASM.startswith(' call'):
+				itisbranch = True
+
+			if 'MYSYM' in DISASM: # 01-01 심볼라이즈된 메모리레퍼런스가 있다면 거른다. 
+				continue
+			if DISASM.startswith(' .') or DISASM.startswith('.'): # 01-02 어셈블러 디렉티브라인도 제외한다. 
+				continue
+			if DISASM.startswith('lea') or DISASM.startswith(' lea'): # 01-03 lea는 예외적으로, 메모리주소가나와도 메모리참조가 아니므로 패스한다. 
+				continue
+			if '(' not in DISASM or ')' not in DISASM: # 01-04 메모리참조가 아니라면 거른다 (그치만 branch instruction은 디폴트로 메모리참조이므로 예외처리)
+				if itisbranch is False:
+					continue
+
+			# MEMREF 설정한다.
+			if MEMREF is None: 											# jmp %eax 같은거. (레지스터만 봤을 때 메모리참조가 아닌것처럼 보이지만, 사실은 메모리레퍼런스인 경우)
+				MEMREF = DISASM.strip().split(' ')[1] 
+				MEMREF = MEMREF.replace('*','') 						# call *eax 에서 %eax만 빼와야 함.
+			else:
+				MEMREF = MEMREF.group().replace('*','')					# call *-0x294(%ebx, %edi, 4) 인경우 call -0x294(%ebx, %edi, 4) 와 같다. 
+			
+			# MEMREF 관련 거르는 인스트럭션 1 : esp 메모리에 대한 참조연산은 크래시 절대안나는 연산이므로 제외한다. --> 아니다. 스택을 이용한 이중참조가 있을 수 있다. ex) call 0x12(%esp)의 경우, 0x0804100을 호출하므로 valid한 인스트럭션이다.
+			if '%esp' in MEMREF and itisbranch is False: # mov 0x12(%esp), %ebx 같은 연산이라면 패스
+				continue 
+			if '%ebp' in MEMREF and itisbranch is False:
+				continue
+
+			# MEMREF 관련 거르는 인스트럭션 2 : 이미 심볼화된것들은 거른다
+			alreadySymbolized = 1
+			for r in GENERAL_REGISTERS: # general register 가 하나라도 있어야 살려줄것이다. (call main, call __libc_start_main 이런거 제외하기 위함)
+				if r in MEMREF: alreadySymbolized = 0
+			if alreadySymbolized is 1:
+				continue 			
+
+
+
+
+
+
+
+			# 브랜치 인스트럭션의 경우 ATT 신텍스가 이상하다. 예를들어 call *%eax 일 경우, 사실상 call %eax 을 수행한다. 심볼화되면 call MYSYM 으로 되야하므로 별(*)을 제거한다
+			itismemref = True
+			if MEMREF in GENERAL_REGISTERS: 							# MEMREF가 알고봤더니 그냥 %eax 요거일경우
+				DISASM = DISASM.replace('*','') 						# 결과에서 별을 제거한다
+				itismemref = False
+			
+			NEWDISASM  = []	
+			NEWDISASM.append('')
+			NEWDISASM.append(' # symbolize_crashhandler_allmemref' 														+ ' ' + '#+++++')
+			NEWDISASM.append(' call MYSYM_backupregistercontext' 														+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %esp, MYSYM_ESP'																		+ ' ' + '#+++++') 
+			NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'																+ ' ' + '#+++++')
+			ref_level = 0
+
+			# 애초에 MYSYM_CRASHADDR 에 저장되는게 다르자나. 그러면 나중에 처리해줄때에는 똑같겠지.....
+			if   itismemref is True and itisbranch is False:   # (%eax) 에 대한 1중참조 																										  
+				ref_level = 1
+				NEWDISASM.append(' lea ' + MEMREF + ', %eax' 															+ ' ' + '#+++++') 
+			elif itismemref is False and itisbranch is True :  #  %eax  에 대한 1중참조	: 분명히 1중참조이지만, 외양상 0중참조이므로 임의로 ()를 붙여줘야 함																							  
+				ref_level = 1
+				NEWDISASM.append(' lea (' + MEMREF + '), %eax' 															+ ' ' + '#+++++') 
+			elif itismemref is True and itisbranch is True :   # (%eax) 에 대한 2중참조. (%eax가 가리키는 메모리가 가리키는 메모리)
+				ref_level = 2
+				NEWDISASM.append(' lea ' + MEMREF + ', %eax' 															+ ' ' + '#+++++')  	
+			
+			NEWDISASM.append(' movl $MYSYM_RETURNTOHERE_'+str(count)+', MYSYM_EIP'										+ ' ' + '#+++++') # 컴백1
+			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 																+ ' ' + '#+++++') 
+			NEWDISASM.append('MYSYM_RETURNTOHERE_' + str(count) + ':'  													+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 																+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %eax'																		+ ' ' + '#+++++') # 차원증가. 1차원
+			if ref_level is 2: # 레퍼런스 레벨이 2 라면, 한번 더 메모리 레퍼런스를 검증
+				NEWDISASM.append(' movl $MYSYM_RETURNTOHERE2_'+str(count)+', MYSYM_EIP'									+ ' ' + '#+++++') # 컴백2
+				NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 															+ ' ' + '#+++++') 
+				NEWDISASM.append('MYSYM_RETURNTOHERE2_' + str(count) + ':'  											+ ' ' + '#+++++') 
+				NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 															+ ' ' + '#+++++') 
+				NEWDISASM.append(' mov (%eax), %eax'																	+ ' ' + '#+++++') # 차원증가. 2차원
+
+																									  
+			NEWDISASM.append(' mov MYSYM_ESP, %esp'																		+ ' ' + '#+++++') # esp 백업
+			NEWDISASM.append(' call MYSYM_restoreregistercontext'														+ ' ' + '#+++++') # 레지스터컨텍스트 백업
+			
+			
+			# 마지막으로 바뀐 디스어셈블리를 붙여준다. 
+			if itisbranch is False: # 브랜치가 아닌 일반적인 멤참조  ex) mov $0x12, 0x12(%eax,%ebx,2)
+				_ = DISASM.replace(MEMREF, '')
+				if '%eax' in _ or '%ax' in _ or '%al' in _ or '%ah' in _: # %ebx : 예외적인 경우, mov %eax, 0x4(%edi) 같이 source가 %eax인 경우... 이때는 %ebx 사용.
+					NEWDISASM.append(' # _ : {}.....Lets use EBX!!!'.format(_))
+					NEWDISASM.append(' mov %ebx, MYSYM_EBX'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음. 위에서 이미 MYSYM_restoreregistercontext 를 호출하자나?
+					NEWDISASM.append(' mov MYSYM_CRASHADDR, %ebx'														+ ' ' + '#+++++')				
+					NEWDISASM.append(DISASM.replace(MEMREF, '(%ebx)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
+					NEWDISASM.append(' mov MYSYM_EBX, %ebx'																+ ' ' + '#+++++') 
+				else: # 디폴트로는  %eax  사용~~~
+					NEWDISASM.append(' # _ : {}.....Lets use EAX!!!'.format(_))
+					NEWDISASM.append(' mov %eax, MYSYM_EAX'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음.
+					NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'														+ ' ' + '#+++++')				
+					NEWDISASM.append(DISASM.replace(MEMREF, '(%eax)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
+					NEWDISASM.append(' mov MYSYM_EAX, %eax'																+ ' ' + '#+++++') 	
+			elif itisbranch is True: # 브랜치
+				DISASM = DISASM.replace('*','')
+				NEWDISASM.append(DISASM.replace(MEMREF, '*MYSYM_CRASHADDR') + ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF))
+				
+			
+			# 끝!
+			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j+1:]
+			count += 1
+	symbolize_counter('Crash(general memory refernece) : {}'.format(count))
+
+'''
+# 메모리레퍼런스가 하나만 있는거
+lods %ds:(%esi), %al   # l/b 의 써픽스가 붙지 않음. 데스티네이션이 레지스터인 경우는 안 붙어도 되는구나. 
+lods %ds:(%esi), %eax
+rep lods %ds:(%esi), %al
+rep lods %ds:(%esi), %eax
+scasb %es:(%edi), %al
+scasl %es:(%edi), %eax
+repe scasb %es:(%edi), %al
+repe scasl %es:(%edi), %eax
+repne scasb %es:(%edi), %al
+repne scasl %es:(%edi), %eax
+stos %al, %es:(%edi)
+stos %eax, %es:(%edi)
+rep stos %al, %es:(%edi)
+rep stos %eax, %es:(%edi)
+xlat %ds:(%ebx)
+'''
+def symbolize_crashhandler_segmentregister_1(resdic):
 	_ = '.*?'
 	count = 0
 	SORTEDADDR = sorted(resdic['.text'])
@@ -214,104 +440,188 @@ def add_someprefix_before_all_memory_reference(resdic):
 		origindexlist = pickpick_idx_of_orig_disasm(resdic['.text'][addr][1]) 
 		for j in reversed(origindexlist):
 			DISASM = resdic['.text'][addr][1][j]
+			if 'Prefix added' in DISASM: # 이미 다른 함수에서 프리픽스가 추가된 상태임...
+				continue
 			if '#' in DISASM: # 주석떼버리기
 				DISASM = DISASM[:DISASM.index('#')] 
-			MEMREF = re.search('(-)?' + '(0x)?' + '[0-9a-f]+' + '(\()' + _ + '(\))', DISASM) # 1. 0x12(%eax,%ebx,4) 객체를 찾는다. 객체를 스트링으로 만드는 법 : .group() 을 써준당.
 
-			# [01] 거르는 인스트럭션
-			itisbranch = False
-			if 'MYSYM' in DISASM: 										# 01-01 심볼라이즈된 메모리레퍼런스가 있다면 거른다. TODO: memory to memory 연산의 경우, 하나가 심볼화된상태라고 쳤을때, 나머지 하나에 대한 크래시대비가 안된다... 나중에 핸들링할것
+			# 어셈블러 디렉티브라인도 제외한다 
+			if DISASM.startswith(' .') or DISASM.startswith('.'):  
 				continue
-			if DISASM.startswith(' .') or DISASM.startswith('.'):	 	# 01-02 어셈블러 디렉티브라인도 제외한다. 
-				continue
-			if DISASM.startswith('lea') or DISASM.startswith(' lea'): 	# 01-03 lea는 예외적으로, 메모리주소가나와도 메모리참조가 아니므로 패스한다. 
-				continue
-			if '(' not in DISASM or ')' not in DISASM: 					# 01-04 메모리참조가 아니라면 거른다 (그치만 branch instruction은 디폴트로 메모리참조이므로 예외처리)
-				if DISASM.startswith('j') or DISASM.startswith(' j'):
-					'branch! defultly memory reference. so pass it!'
-					itisbranch = True
-				elif DISASM.startswith('call') or DISASM.startswith(' call'):
-					'branch! defultly memory reference. so pass it!'
-					itisbranch = True
-				else:
-					continue
 
-			# MEMREF 설정한다.
-			if MEMREF is None: 											# jmp %eax 같은거. (레지스터만 봤을 때 메모리참조가 아닌것처럼 보이지만, 사실은 메모리레퍼런스인 경우)
-				MEMREF = DISASM.strip().split(' ')[1] 
-				MEMREF = MEMREF.replace('*','') 						# call *eax 에서 %eax만 빼와야 함.
+			# 인스트럭션이  lods, scas, stos, xlat 인 경우만 대상으로 한다. 
+			_components = DISASM.split()
+			if len(_components) < 2: # 예외처리
+				continue
+			if _components[0].startswith('rep'):
+				_instruction = _components[1]
 			else:
-				MEMREF = MEMREF.group()
-			
+				_instruction = _components[0]
+			target_instruction = 'no'
+			for _segment_instruction in ['lods','scas','stos','xlat', 'ins', 'outs']: # ins, outs 도 포함. 
+				if _instruction.startswith(_segment_instruction):
+					target_instruction = 'yes'
+			if target_instruction is 'no':
+				continue 
 
-			# [02] 거르는 인스트럭션
-			if 'esp' in MEMREF: 					 				   # 02-01 esp 메모리에 대한 참조연산은 크래시 절대안나는 연산이므로 제외한다. 
+			# %fs, %gs의 베이스주소는 0이 아니므로 이 휴리스틱을 적용할 수 없다. 
+			if '%fs' in DISASM or '%gs' in DISASM:
 				continue
 
-			filterout = 1											   # 02-02 이미 심볼화가 된 메모리참조 연산도 제외한다. ex) call main, call __libc_start_main
-			for r in GENERAL_REGISTERS:  
-				if r in MEMREF: 
-					filterout = 0
-			if filterout is 1:
-				continue 			
+			# 메모리참조하는 부분만 추출한다. (%ds:(%eax)) (일하기 싫어하는 캡스톤은 가끔가다가 (%eax) 이렇게 나타내기도 함. 그런데 그런 경우, 이미 위에서 핸들링이 되어있겠지.. 그러니 지금시점에서는 신경안써줘도 된다. ) 
+			MEMREF = DISASM[DISASM.index('('): DISASM.index(')') + 1] # %cs, %ds, %ss, %es 같은 유명무실한 (base address 값이 0) 레지스터 제거
+			MEMREF_REG = MEMREF.replace('(','').replace(')','')
 
-			# 브랜치 인스트럭션의 경우 ATT 신텍스가 이상하다. 예를들어 call *%eax 일 경우, 사실상 call %eax 을 수행한다. 심볼화되면 call MYSYM 으로 되야하므로 별(*)을 제거한다
-			itismemref = True
-			if MEMREF in GENERAL_REGISTERS: 			# MEMREF가 알고봤더니 그냥 %eax 요거일경우
-				DISASM = DISASM.replace('*','') 		# 결과에서 별을 제거한다
-				itismemref = False
-		
 			NEWDISASM  = []	
-			NEWDISASM.append(' # add_someprefix_before_all_memory_reference' 		+ ' ' + '#+++++')
-			NEWDISASM.append(' pushal' 												+ ' ' + '#+++++') # BACKUP1. 레지스터 컨텍스트 백업
-			NEWDISASM.append(' pushf' 												+ ' ' + '#+++++') # BACKUP1. 
-			NEWDISASM.append(' mov %esp, MYSYM_ESP'									+ ' ' + '#+++++') # BACKUP2. 스택프레임 백업
-			NEWDISASM.append(' push $MYSYM_RETURNTOHERE_' + str(count) 				+ ' ' + '#+++++') # BACKUP3. 위험한 라인의 EIP를 백업
-			NEWDISASM.append(' pop MYSYM_EIP' 										+ ' ' + '#+++++') # BACKUP3.
-			if itismemref is True: 																	  # BACKUP4. 크래시유발 주소값 백업 MYSYM_CRASHADDR 에 들어감. 
-				NEWDISASM.append(' lea ' + MEMREF + ', %eax' 						+ ' ' + '#+++++') # BACKUP4. 	case1. jmp 0x12(%eax) 에서 0x12(%eax) 백업
-			elif itismemref is False:	 															  # BACKUP4. 	
-				NEWDISASM.append(' lea (' + MEMREF + '), %eax' 						+ ' ' + '#+++++') # BACKUP4.	case2. jmp %eax 에서 %eax 백업
-			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 							+ ' ' + '#+++++') # BACKUP4. 
-			NEWDISASM.append('MYSYM_RETURNTOHERE_' + str(count) + ':'  				+ ' ' + '#+++++') # > 심볼선언. (EIP 백업. 크래시핸들러는 여기로 컴백홈)
-			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 							+ ' ' + '#+++++') # BACKUP5. 크래시유발 주소값에서 READ 시도
-			NEWDISASM.append(' mov (%eax), %eax'									+ ' ' + '#+++++') # BACKUP5. 							  >>>CRASH<<<
-			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR_R'							+ ' ' + '#+++++') # BACKUP5. 										 MYSYM_CRASHADDR_R 셋팅
-																									  # BACKUP3.         : EIP 복원 							( ---> 크래시핸들러가 해줬음)
-																									  # BACKUP4 & BACKUP5 : 크래시유발 주소값 복원및 READ시도	( ---> EIP 복원된후로 재시행됬음)
-			NEWDISASM.append(' mov MYSYM_ESP, %esp'									+ ' ' + '#+++++') # BACKUP2. 스택프레임 복원
-			NEWDISASM.append(' popf'												+ ' ' + '#+++++') # BACKUP1. 레지스터 컨텍스트 복원
-			NEWDISASM.append(' popal'												+ ' ' + '#+++++') # BACKUP1.
-			
-			
-			# 마지막으로 바뀐 디스어셈블리를 붙여준다. 
-			if itisbranch is False and itismemref is True:						# [01] 	메모리참조O. 브랜치X.  ex) mov $0x12, 0x12(%eax,%ebx,2)
-				if '%eax' not in DISASM.replace(MEMREF, ''): 					# 		%eax : 일반적인 경우 메모리참조연산의 희생자로 %eax 사용				
-					NEWDISASM.append(' mov %eax, MYSYM_EAX'																+ ' ' + '#+++++')
-					NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'														+ ' ' + '#+++++')				
-					NEWDISASM.append(DISASM.replace(MEMREF, '(%eax)')													+ '# original : ' + resdic['.text'][addr][1][j] + ' ' + '#+++++') 
-					NEWDISASM.append(' mov MYSYM_EAX, %eax'																+ ' ' + '#+++++') 		
-				else:															# 		%ebx : 예외적인 경우, mov %eax, 0x4(%edi) 같이 source가 %eax인 경우... 이때는 %ebx 사용.
-					NEWDISASM.append(' mov %ebx, MYSYM_EBX'																+ ' ' + '#+++++')
-					NEWDISASM.append(' mov MYSYM_CRASHADDR, %ebx'														+ ' ' + '#+++++')				
-					NEWDISASM.append(DISASM.replace(MEMREF, '(%ebx)')													+ '# original : ' + resdic['.text'][addr][1][j] + ' ' + '#+++++') 
-					NEWDISASM.append(' mov MYSYM_EBX, %ebx'																+ ' ' + '#+++++') 
+			NEWDISASM.append('')
+			NEWDISASM.append(' # symbolize_crashhandler_segmentregister_1' 		+ ' ' + '#+++++')
+			NEWDISASM.append(' call MYSYM_backupregistercontext'								+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %esp, MYSYM_ESP'												+ ' ' + '#+++++') 
+			NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'										+ ' ' + '#+++++')
 
-			elif itisbranch is True and itismemref is False:					# [02]	메모리참조X. 브랜치O.  ex) jmp %eax 이거나 jmp *%eax  ---> jmp *MYSYM 으로 바꾼다
-				DISASM = DISASM.replace('*','')
-				NEWDISASM.append(DISASM.replace(MEMREF, '*MYSYM_CRASHADDR') + '# original : ' + resdic['.text'][addr][1][j] 		+ ' ' + '#+++++')
-			elif itisbranch is True and itismemref is True:						# [03]	메모리참조O. 브랜치O.  ex) jmp (%eax) 브랜치하면서 동시에 메모리참조 ---> jmp *MYSYM_R 으로 바꾼다
-				NEWDISASM.append(DISASM.replace(MEMREF, '*MYSYM_CRASHADDR_R') + '# original : ' + resdic['.text'][addr][1][j] 		+ ' ' + '#+++++')
-			# 끝!
-			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j+1:]
+			NEWDISASM.append(' movl $MYSYM_RETURNTOHERE_SEG1_' + str(count) + ', MYSYM_EIP'		+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov ' + MEMREF_REG + ', MYSYM_CRASHADDR' 						+ ' ' + '#+++++') 
+			NEWDISASM.append('MYSYM_RETURNTOHERE_SEG1_' + str(count) + ':'  					+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'										+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %eax'												+ ' ' + '#+++++') # 크래시 여부 테스트
+			 
+			NEWDISASM.append(' call MYSYM_restoreregistercontext'								+ ' ' + '#+++++')
+			NEWDISASM.append(' mov MYSYM_ESP, %esp'												+ ' ' + '#+++++')
+
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, ' + MEMREF_REG								+ ' ' + '#+++++') # SETTING. 마지막으로 크래시유발 레지스터값을 (resolve해준) 레지스터값으로 셋팅 
+			# 원본 디스어셈블리를 붙여준다.
+			resdic['.text'][addr][1][j] += ' # Prefix added.' # 프리픽스 핸들링해줬다는 플래그를 붙인다. 
+			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j:] 
 			count = count+1
+	symbolize_counter('Crash(segment register 1) : {}'.format(count))
 
 
-def add_someprefix_before_all_external_functioncall(resdic):
+
+
+'''
+movsb (%esi), %es:(%edi)
+movsl (%esi), %es:(%edi)
+rep movsb (%esi), %es:(%edi)
+rep movsl (%esi), %es:(%edi)
+outsb %ds:(%esi), (%dx)
+outsl %ds:(%esi), (%dx)
+rep outsb %ds:(%esi), (%dx)
+rep outsl %ds:(%esi), (%dx)
+insb (%dx), %es:(%edi) 
+insl (%dx), %es:(%edi) 
+rep insb (%dx), %es:(%edi) 
+rep insl (%dx), %es:(%edi) # 그냥 dx구나!
+cmpsb %es:(%di), %ds:(%si)
+cmpsl %es:(%edi), %ds:(%esi)
+repne cmpsb %es:(%di), %ds:(%si)
+repne cmpsl %es:(%edi), %ds:(%esi)
+repe cmpsb %es:(%di), %ds:(%si)
+repe cmpsl %es:(%edi), %ds:(%esi)
+'''
+# movsb, outsb, insb, cmpsb 
+def symbolize_crashhandler_segmentregister_2(resdic):
 	_ = '.*?'
 	count = 0
 	SORTEDADDR = sorted(resdic['.text'])
+
 	for i in xrange(len(resdic['.text'].keys())):
+		addr = SORTEDADDR[i]
+		origindexlist = pickpick_idx_of_orig_disasm(resdic['.text'][addr][1]) 
+		for j in reversed(origindexlist):
+			DISASM = resdic['.text'][addr][1][j]
+			if 'Prefix added' in DISASM: # 이미 다른 함수에서 프리픽스가 추가된 상태임...
+				continue
+			if '#' in DISASM: # 주석떼버리기
+				DISASM = DISASM[:DISASM.index('#')] 
+
+			# 어셈블러 디렉티브라인을 제외한다 
+			if DISASM.startswith(' .') or DISASM.startswith('.'):  
+				continue
+
+			# 인스트럭션이 movs, outs, ins, cmps 인 경우만 대상으로 한다. 
+			_components = DISASM.split()
+			if len(_components) < 2: # 예외처리
+				continue
+			if _components[0].startswith('rep'):
+				_instruction = _components[1]
+			else:
+				_instruction = _components[0]
+			target_instruction = 'no'
+			for _segment_instruction in ['movs','cmps']: # ['movs','outs','ins','cmps'] COMMENT: ins, outs 의 형태는 insb (%ds), %es:(%edi) 가 된다. 그런데 1. (%ds)는 port를 의미한다는데, 크래시위험이 없음. 이미셋팅된값을 의미하기때문 / 또한 캡스톤에서 버그가 잇는데 insb %ds, %es:(%edi) 로 잘못 디스어셈블한다는 점. 따라서 symbolize_crashhandler_segmentregister_1 로 보내자. 
+				if _instruction.startswith(_segment_instruction):
+					target_instruction = 'yes'
+			if _instruction.startswith('movsbl') or _instruction.startswith('movswl') or _instruction.startswith('movsbw'): # movsbl(==movzbl) 은 다른인스트럭션이므로 예외처리. (메모리(source)에서 UNSigned single byte 읽어와가지고 그 읽어온값을 레지스터(destination)에다가 넣는다.) 
+				target_instruction = 'no' 
+
+			if target_instruction is 'no':
+				continue 
+
+			# 메모리참조하는 부분만 추출한다. ex) movsl (%esi), %es:(%edi) 에서 (%esi), (%edi) 를 추출함
+			_ = DISASM
+			MEMREF_1 = _[_.index('('):_.index(')') + 1] 
+			_ = _.replace(MEMREF_1,'') 
+			MEMREF_2 = _.replace(MEMREF_1,'')[_.index('('):_.index(')') + 1] 
+			MEMREF_1_REG = MEMREF_1.replace('(','').replace(')','') 
+			MEMREF_2_REG = MEMREF_2.replace('(','').replace(')','') 
+
+			NEWDISASM  = []	
+			NEWDISASM.append('')
+			NEWDISASM.append(' # symbolize_crashhandler_segmentregister_2' 		+ ' ' + '#+++++')
+			NEWDISASM.append(' pushal' 															+ ' ' + '#+++++') 
+			NEWDISASM.append(' pushf' 															+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %esp, MYSYM_ESP'												+ ' ' + '#+++++') 
+			NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'										+ ' ' + '#+++++')
+
+			# 두개의 잠재적 크래시유발러 백업
+			NEWDISASM.append(' mov ' + MEMREF_1_REG + ', MYSYM_CRASHADDR_LEFT'					+ ' ' + '#+++++')
+			NEWDISASM.append(' mov ' + MEMREF_2_REG + ', MYSYM_CRASHADDR_RIGHT'					+ ' ' + '#+++++')
+
+			# 첫번째 잠재적 크래시유발러 핸들링부분
+			NEWDISASM.append(' push MYSYM_CRASHADDR_LEFT'				 						+ ' ' + '#+++++') 
+			NEWDISASM.append(' pop MYSYM_CRASHADDR'						 						+ ' ' + '#+++++') 
+
+			NEWDISASM.append(' push $MYSYM_RETURNTOHERE_SEG2_LEFT_' + str(count) 				+ ' ' + '#+++++') # EIP 설정 
+			NEWDISASM.append(' pop MYSYM_EIP' 													+ ' ' + '#+++++') 
+			
+			NEWDISASM.append('MYSYM_RETURNTOHERE_SEG2_LEFT_' + str(count) + ':'  				+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov MYSYM_CRASHADDR,   %eax'										+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %eax'												+ ' ' + '#+++++') # >>>CRASH<<<
+			NEWDISASM.append(' push MYSYM_CRASHADDR'											+ ' ' + '#+++++')
+			NEWDISASM.append(' pop MYSYM_CRASHADDR_LEFT'										+ ' ' + '#+++++')
+
+
+			# 두번째 잠재적 크래시유발러 핸들링부분
+			NEWDISASM.append(' push MYSYM_CRASHADDR_RIGHT'				 						+ ' ' + '#+++++') 
+			NEWDISASM.append(' pop MYSYM_CRASHADDR'						 						+ ' ' + '#+++++') 
+
+			NEWDISASM.append(' push $MYSYM_RETURNTOHERE_SEG2_RIGHT_' + str(count) 				+ ' ' + '#+++++') # EIP 설정
+			NEWDISASM.append(' pop MYSYM_EIP' 													+ ' ' + '#+++++')
+
+			NEWDISASM.append('MYSYM_RETURNTOHERE_SEG2_RIGHT_' + str(count) + ':'  				+ ' ' + '#+++++')
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'										+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %eax'												+ ' ' + '#+++++') # >>>CRASH<<<
+			NEWDISASM.append(' push MYSYM_CRASHADDR'											+ ' ' + '#+++++')
+			NEWDISASM.append(' pop MYSYM_CRASHADDR_RIGHT'										+ ' ' + '#+++++')
+			
+			NEWDISASM.append(' mov MYSYM_ESP, %esp'												+ ' ' + '#+++++')
+			NEWDISASM.append(' popf'															+ ' ' + '#+++++')
+			NEWDISASM.append(' popal'															+ ' ' + '#+++++')
+			
+			NEWDISASM.append(' mov MYSYM_CRASHADDR_LEFT, '    + MEMREF_1_REG					+ ' ' + '#+++++')
+			NEWDISASM.append(' mov MYSYM_CRASHADDR_RIGHT, '   + MEMREF_2_REG					+ ' ' + '#+++++')
+			
+			# 원본 디스어셈블리를 붙여준다.
+			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j:]
+			count = count+1	
+	symbolize_counter('Crash(segment register 2) : {}'.format(count))
+
+
+
+def symbolize_crashhandler_externalfunctioncall(resdic):
+	_ = '.*?'
+	count = 0
+	SORTEDADDR = sorted(resdic['.text'])
+	for i in xrange(len(resdic['.text'].keys())): 
 		addr = SORTEDADDR[i]
 		origindexlist = pickpick_idx_of_orig_disasm(resdic['.text'][addr][1]) 
 		for j in reversed(origindexlist):
@@ -323,38 +633,56 @@ def add_someprefix_before_all_external_functioncall(resdic):
 				continue
 			
 			INSTRUCTION = ll[0] 
-			OPERAND     = ll[1]
+			funcName     = ll[1]
 
 			# 외부 라이브러리 콜만 필터링한다
-			if not INSTRUCTION.startswith('call'):
-				continue
-			
-			if 'MYSYM' in OPERAND: 
+			if INSTRUCTION.startswith('call') or INSTRUCTION.startswith('jmp') : # jmp __fprintf_chk 으로, 립씨함수로 call하는게 아니라 jmp하는 경우도 있다!
+				'external function call!'
+			else:
 				continue
 
-			for namedsymbol in MyNamedSymbol:
-				if namedsymbol in OPERAND:
-					continue
+			if 'MYSYM' in funcName: 
+				continue
+			if funcName is 'main':
+				continue
+			if funcName.startswith('__x86.get_pc_thunk'):
+				continue
+			if funcName in symbolize_heuristic_list_call: # 이 함수는 내가 확실히 파라미터에 관한 정보를 아는 함수다. 그러니까 휴리스틱하게 처리해줄거니깐 하지마라. 
+				'GO TO symbolize_crashhandler_externalfunctioncall_heuristically'
+				continue 
+			c = 'no'
+			for _r in GENERAL_REGISTERS: # call *%eax, call (%ebx) 이런것들
+				if _r in funcName:
+					c = 'yes'
+			if c is 'yes':
+				continue
+
+			symbolname0 = 'MYSYM_LIBCALL_' + hex(addr)
+			symbolname1 = 'MYSYM_RETURNTOHERE_LIB_' + hex(addr)
 
 			NEWDISASM = []
-			NEWDISASM.append(' # add_someprefix_before_all_memory_reference' 		+ ' ' + '#+++++')
-			NEWDISASM.append(' movl $0x1, MYSYM_LIBFLAG'							+ ' ' + '#+++++') # 라이브러리 크래시 플래그 셋팅
-			NEWDISASM.append(' call MYSYM_backupregistercontext'					+ ' ' + '#+++++') #  <<< 1 레지스터 컨텍스트 백업
-			NEWDISASM.append(' mov %esp, MYSYM_ESP'									+ ' ' + '#+++++') # 	<<< 2.스택프레임 백업
-			NEWDISASM.append(' push $MYSYM_RETURNTOHERE_LIB_' + str(count) 			+ ' ' + '#+++++') # 		<<< 3. 위험한 라인의 EIP를 백업해 둡니다. (크래시핸들러가 관리함) 
-			NEWDISASM.append(' pop MYSYM_EIP' 										+ ' ' + '#+++++') # 		>>> 3. EIP 복원
-			NEWDISASM.append('MYSYM_RETURNTOHERE_LIB_' + str(count) + ':'  			+ ' ' + '#+++++') #
-			NEWDISASM.append(' mov MYSYM_ESP, %esp'									+ ' ' + '#+++++') # 	>>> 2. 스택프레임 복원
-			NEWDISASM.append(' call MYSYM_restoreregistercontext'					+ ' ' + '#+++++') #  >>> 1 레지스터 컨텍스트 복원
-			# 일반상태랑 다른게있다면, 
-			# 일반은					 pushal [스냅샷!] -->	크래시	--> popal
-			# 라이브러리일 경우에는 	 pushal [스냅샷!] --> 	popal 	--> 크래시. 그래서 [스냅샷]으로 돌아간다고해도 스택이 손상되어있음. 따라서 call MYSYM_backupregistercontext 써줘야함. 
-			NEWDISASM.append(resdic['.text'][addr][1][j])
-			NEWDISASM.append( 'movl $0x0, MYSYM_LIBFLAG'							+ ' ' + '#+++++') # 라이브러리 크래시 플래그 복원
+			NEWDISASM.append('')
+			NEWDISASM.append('# symbolize_crashhandler_externalfunctioncall'	    		+ ' ' + '#+++++')
+			# [01] 가장급한건 컨텍스트 저장		
+			NEWDISASM.append(' call MYSYM_backupregistercontext'							+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %esp, MYSYM_ESP'											+ ' ' + '#+++++') 
+			# [02] 플래그같은거 설정해줌
+			NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_EXITADDR'			 		+ ' ' + '#+++++') # 라이브러리 콜부를 MYSYM_EXITADDR 에다가 저장한다.
+			# [03] 여기서부터 크래시핸들러 관련된것 설정
+			NEWDISASM.append(' movl $' + symbolname1 + ', MYSYM_EIP'						+ ' ' + '#+++++') # 플래그는 항상 크래시 핸들러 호출하기 전에 설정한다. 크래시핸들러 한번 들어갔다나오면 0으로 초기화되므로
+			NEWDISASM.append(symbolname1 + ':'  											+ ' ' + '#+++++') 
+			NEWDISASM.append(' movl $0x1, MYSYM_LIBFLAG'									+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov MYSYM_ESP, %esp'											+ ' ' + '#+++++') 
+			NEWDISASM.append(' call MYSYM_restoreregistercontext'							+ ' ' + '#+++++') 
+					
+			NEWDISASM.append(symbolname0 + ':'												+ ' ' + '#+++++') # COMMENT: 이건 사실 없어도 되잖아? 왜냐하면........ 아냐근데 있어도 되니까 냅두자
+			NEWDISASM.append(resdic['.text'][addr][1][j]													)
 
 			# 끝!
-			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j+1:]
+			resdic['.text'][addr][1]  = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j+1:]
 			count = count+1
+	
+	symbolize_counter('Crash(external functioncall) : {}'.format(count))
 
 
 
@@ -388,4 +716,116 @@ def getpcthunk_to_returnoriginalADDR(resdic):
 				symbolname		= resdic[sectionName][addr][0]
 				if 'get_pc_thunk' in symbolname:
 					resdic[sectionName][addr][1][0] = resdic[sectionName][addr][1][0].replace('0(%esp)','MYSYM_EIP').replace('(%esp)','MYSYM_EIP') # 원본 : movl 0(%esp), %ebx , 바뀐후 : movl MYSYM_EIP, %ebx
+
+
+
+def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리스틱 픽싱할때는, LIBFLAG를 설정해주면 안됨. 왜냐하면 크래시핸들러가 스택을 직접바꾸는게 아니라, 아래의 인스트루멘테이션 된 인스트럭션에서 CRASHADDR를 이용해서 스택을 손봐주기 때문에.
+
+	origindexlist = pickpick_idx_of_orig_disasm(resdic_text[ADDR][1]) 
+	j = 0
+	NEWDISASM = []
+	symbolname0 = 'MYSYM_LIBCALL_' + hex(ADDR)
+
+	# [01] 가장급한건 컨텍스트 저장
+	NEWDISASM.append('')
+	NEWDISASM.append(' # heuristic_stack_fixing' 											+ ' ' + '#+++++')
+	NEWDISASM.append(' call MYSYM_backupregistercontext' 									+ ' ' + '#+++++') 
+	NEWDISASM.append(' mov %esp, MYSYM_ESP'													+ ' ' + '#+++++') 
+	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'												+ ' ' + '#+++++')
+
+	# [02] 플래그같은거 설정해줌 
+	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_EXITADDR' 							+ ' ' + '#+++++') 
+	for paramnum in nst_param_list:
+		if paramnum > 1000: # 뒤로 쭉 반복된다는 뜻이다. 그 파라미터부터 for문으로 크래시쭉쭉 발생시키면서 핸들링하자. paramnum/1000 부터 크래시핸들러가 더이상 할일이없어서 MYSYM_EXITADDR 로 리턴할때까지 계-속 스택픽싱을 반복한다. 
+			paramnum = paramnum/1000
+			LOC_ESP   = '{}(%esp)'.format(hex(4*(paramnum - 1))) 
+			symbolname1 = 'MYSYM_FORLOOP_' + hex(ADDR) 
+			symbolname2 = 'MYSYM_PARAMINFI_' + hex(ADDR)  
+
+			# n~ 번째 파라미터에 대한 스택픽싱을 설치한당.
+			NEWDISASM.append('')
+			NEWDISASM.append(' # ' + ' ∞st stack fixing... : ' + LOC_ESP	  			    + ' ' + '#+++++')
+			NEWDISASM.append(' lea ' + LOC_ESP + ', %esi'									+ ' ' + '#+++++') # 현재스택의위치 저장
+			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+
+			NEWDISASM.append(symbolname1 + ':'												+ ' ' + '#+++++')
+			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 만약에 크래시핸들러가 EXIT갈때까지갔다면, MYSYM_EXIT 에서는 바로 라이브러리콜하는곳으로 간당.
+			
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # esi (%esp 대체품) 에서부터 쫄쫄 올라가면서 스택픽싱한당.
+			NEWDISASM.append(' mov (%esi), %eax' 											+ ' ' + '#+++++')
+			
+			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 									+ ' ' + '#+++++')
+			NEWDISASM.append( symbolname2 + ':'									 			+ ' ' + '#+++++') # 컴백은 여기로.
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 									+ ' ' + '#+++++') # 값읽기 : 스택 -> %eax 
+			NEWDISASM.append(' mov (%eax), %ebx'											+ ' ' + '#+++++') # 크래시유발 (%eax 의 유효성검증)
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++')
+			NEWDISASM.append(' mov %eax, (%esi)' 											+ ' ' + '#+++++')
+			NEWDISASM.append(' add $0x4, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+
+			NEWDISASM.append(' jmp ' + symbolname1 											+ ' ' + '#+++++')
+
+		else:
+			LOC_ESP  = '{}(%esp)'.format(hex(4*(paramnum - 1))) # 첫번째 파라미터라면 esp+0, 두번째 파라미터라면 esp+4, ...
+			symbolname1 = 'MYSYM_PARAM' + str(paramnum) + '_' +  hex(ADDR)
+			
+			# n번째 파라미터에 대한 스택픽싱을 설치한당.
+			NEWDISASM.append('')
+			NEWDISASM.append(' movl $' + symbolname1 +', MYSYM_EIP' 						+ ' ' + '#+++++')
+
+			NEWDISASM.append('')
+			NEWDISASM.append(' # ' + str(paramnum) + 'st stack fixing... : ' + LOC_ESP		+ ' ' + '#+++++')	
+			NEWDISASM.append(' lea ' + LOC_ESP + ', %esi' 								  	+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+			
+			NEWDISASM.append(' mov (%esi), %eax'											+ ' ' + '#+++++')
+			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 									+ ' ' + '#+++++') # 0x0(esp) 를 MYSYM_CRASHADDR 에다가 옮긴다. 
+			
+			NEWDISASM.append( symbolname1 + ':'  			  								+ ' ' + '#+++++') # 크래시난다면 여기로 돌아와. 이 딱 중간이여야해. 
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 									+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %ebx'											+ ' ' + '#+++++') # 크래시 유발...ㅋㅋㅋ
+
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # Fixing 된 주소를 0x0(esp) 에다가 넣는다 
+			NEWDISASM.append(' mov %eax, (%esi)'											+ ' ' + '#+++++')
+
+	NEWDISASM.append('')
+	NEWDISASM.append(symbolname0 + ':'														+ ' ' + '#+++++') 
+	NEWDISASM.append(' mov MYSYM_ESP, %esp'											      	+ ' ' + '#+++++') # esp 복구
+	NEWDISASM.append(' call MYSYM_restoreregistercontext'								  	+ ' ' + '#+++++') # 레지스터컨텍스트 백업
+	NEWDISASM.append(resdic_text[ADDR][1][j]												+ ' ' + '#+++++') # COMMENT: 왜 원본디스어셈블리인데도 #+++++ 추가해주냐면? --> symbolize_crashhandler_externalfunctioncall 에서 처리해주지 말라고. 
+
+
+
+	resdic_text[ADDR][1]  = resdic_text[ADDR][1][:j] + NEWDISASM + resdic_text[ADDR][1][j+1:]
+
+
+
+# destinations = VSA_and_extract_addr(DISASM) 
+def symbolize_crashhandler_externalfunctioncall_heuristically(resdic):
+	symbolcount = 0	
+	symbolize_count = 0
+	for sectionName in CodeSections_WRITE:
+		if sectionName in resdic.keys():
+			for ADDR in resdic[sectionName].keys():
+				
+				orig_i_list = pickpick_idx_of_orig_disasm(resdic[sectionName][ADDR][1])
+				for orig_i in orig_i_list:
+					DISASM = resdic[sectionName][ADDR][1][orig_i]
+					if DISASM.startswith('call') or DISASM.startswith(' call'):
+						funcname = DISASM.strip().split()[1]
+						if funcname in symbolize_heuristic_list_call.keys(): # 이 함수에 hit 하면은 , 이함수에 push로 전달되는 n번째 파라미터를 심볼화한다
+							nst_param_list = symbolize_heuristic_list_call[funcname]
+							heuristic_stack_fixing(resdic[sectionName],ADDR, nst_param_list)
+					elif DISASM.startswith('j') or DISASM.startswith(' j'):
+						funcname = DISASM.strip().split()[1]
+						if funcname in symbolize_heuristic_list_jmp.keys(): # 이 함수에 hit 하면은 , 이함수에 push로 전달되는 n번째 파라미터를 심볼화한다
+							nst_param_list = symbolize_heuristic_list_jmp[funcname]
+							heuristic_stack_fixing(resdic[sectionName],ADDR, nst_param_list)
+
+	
+
+
+
+
+
+
 

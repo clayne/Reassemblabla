@@ -15,6 +15,10 @@ TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got'
 MyNamedSymbol = ['main', '__x86.get_pc_thunk']
 crts = "/usr/lib/i386-linux-gnu/crtn.o "
 
+# 세그먼트 레지스터를 사용한 인스트럭션
+segmentinstr = ['cmps', 'lds', 'lods', 'movs', 'outs', 'ins', 'rep', 'scas', 'stos', 'xlat']
+
+
 # 우선 모든섹션 다 써준다. 
 DoNotWriteThisSection = [] 
 # 심볼의 프리픽스
@@ -22,7 +26,6 @@ SYMPREFIX = ['']
 
 # 레지스터
 GENERAL_REGISTERS = ['%eax', '%ebx', '%ecx', '%edx', '%edi', '%esi', '%ebp', '%esp', '%eip']
-
 
 # global regex
 _ = '.*?'
@@ -136,6 +139,7 @@ p_PATTERN_02.append(re.compile(' sub'     + RM32['M_REG'] + REG ))
 p_PATTERN_02.append(re.compile(' xchg'    + RM32['M_REG'] + REG ))
 p_PATTERN_02.append(re.compile(' xor'     + RM32['M_REG'] + REG ))
 p_PATTERN_02.append(re.compile(' lea'     + RM32['M_REG'] + REG )) # lea 는 lea + m + r32 로 c9x.me에 나와있는데, m은 진짜 m임. "lea (%esi), %esi"이나 "lea 0x11111111, %edi" 는 가능하지만  "lea %esi, %esi"->불가 "lea $0x11111111, %edi"->불가 
+
 
 p_PATTERN_02R.append(re.compile(' adc'     + RM32['R_REG'] + REG ))
 p_PATTERN_02R.append(re.compile(' add'     + RM32['R_REG'] + REG ))
@@ -381,6 +385,12 @@ p_PATTERN_INFORMATION_LOSS = []
 # 이렇게 register 값을 변경하는 인스트럭션 모아보기.
 
 
+# 세그먼트 레지스터를 이용한 메모리 레퍼런스
+p_PATTERN_SEGMENTREGISTER = re.compile( '(%cs|%ds|%ss|%es)' + '(\:)' + '\(' + '(%eax|%ebx|%ecx|%edx|%edi|%esi|%ebp|%esp|%eip)' + '\)' ) # ex) %ds:(%esi)
+# 일반 메모리 레퍼런스
+#p_PATTERN_MEMREF_REGISTER = re.compile( '(-)?' + '(0x)?' + '[0-9a-f]+' + '(\()' + _ + '(\))') # ex) 0x12(%eax,%ebx,4) 
+p_PATTERN_MEMREF_REGISTER = re.compile( '[^\ ]+' + '(\()' + _ + '(\))') # ex) 0x12(%eax,%ebx,4) 
+
 # 원래있던것
 p_add     = re.compile(' add' + IMM + REG)                     # add $0x1b53, %ebx
 p_sar     = re.compile(' sar' + IMM + REG)                     # sar $0x2, %ebx
@@ -390,3 +400,12 @@ p_xor     = re.compile(' xor' + REG + REG)                     # xorl %edi, %edi
 p_push    = re.compile(' push' + RM32['M_REG'])                # pushl.d32 -0xc(%ebx)          
 p_call    = re.compile(' call' + _ + ' ' + '\*' + '[-+]?' + '(0x)?' + '[0-9a-f]+' + _ + '%' + _ + '%' + _)  # calll.d32 *-0xf8(%ebx, %edi, 4)
 p_bracket = re.compile('\<.*?\>')
+
+# 아래 함수의 파라미터들은 (데이터임에도 불구하고)휴리스틱하게 심볼라이즈 해줍니다
+
+# COMMENT: 1000 이 곱해져있는경우는, n번째 파라미터부터 쭉- 무한대까지 심볼라이즈를 해준다.
+# COMMENT: jmp 로 라이브러리함수를 호출한다면, '__fprintf_chk':[4000] 이렇게 파라미터자리가 한칸 +된다.
+symbolize_heuristic_list_call = {'__cxa_atexit':[1], '__printf_chk':[2000], '__fprintf_chk':[3000], 'strlen':[1], 'qsort':[1,4]}
+symbolize_heuristic_list_jmp  = {'__cxa_atexit':[2], '__printf_chk':[3000], '__fprintf_chk':[4000], 'strlen':[2], 'qsort':[2,5]}
+
+# 아아,,, 

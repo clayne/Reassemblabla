@@ -58,6 +58,8 @@ if __name__=="__main__":
 			sys.exit(0)
 
 
+	symbolize_counter("\n\nLets count! : {}".format(options.filename))
+
 	SHTABLE = get_shtable(options.filename)
 
 	# initialize resdic
@@ -78,8 +80,8 @@ if __name__=="__main__":
 
 	# PIE라면 외부라이브러리 resolve를 해주기 위해 휴리스틱 필요. (.plt.got 부분이 jmpl *0xc(%ebx)이렇게 생겨서 원샷에 resolve 못한다)
 	if CHECKSEC_INFO.pie == True:  
-		logging("now PIE_LazySymbolize_GOTbasedpointer_pltgot")
-		PIE_LazySymbolize_GOTbasedpointer_pltgot(CHECKSEC_INFO, resdic)
+		logging("now emulation_pltfix")
+		emulation_pltfix(CHECKSEC_INFO, resdic)
 
 	# pie바이너리를 위한 테이블수정...
 	if CHECKSEC_INFO.pie == True:
@@ -122,38 +124,58 @@ if __name__=="__main__":
 
 	# 일반 심볼 심볼라이즈
 	logging("now symbolize_textsection")
-	symbolize_textsection(resdic)
+	symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
 	logging("now symbolize_datasection")
 	symbolize_datasection(resdic)
 
 	# 에뮬레이션을 이용한 심볼라이즈
 	logging("now PIE_set_getpcthunk_loc")
 	PIE_set_getpcthunk_loc(resdic) # 주의: get_pc_thunk를 호출하는지안하는지는 symbolize_textsection 을 거친후에야 알수있다. 함수 호출순서가 항상 뒤에오도록 신경써줄 것
-	logging("now PIE_calculated_addr_symbolize")
-	PIE_calculated_addr_symbolize(resdic, options.testingcrashhandler)
+	
+
+
+
+
+
+
+
+
+	logging("now emulation")
+	emulation(resdic, options.testingcrashhandler)
+
+
+
+
+
+
+
+
 	
 	# 휴리스틱을 이용한 심볼라이즈 (GOT 베이스로 데이터에 접근하는 경우 휴리스틱 이용)
-	logging("now PIE_LazySymbolize_GOTbasedpointer")
-	PIE_LazySymbolize_GOTbasedpointer(pcthunk_reglist, resdic,CHECKSEC_INFO) 
+	if options.testingcrashhandler is True: # Crash based 디자인에서는 필요없음
+		'nothing to do'
+	else:
+		# got 기반
+		logging("now emulation_got")
+		emulation_got(pcthunk_reglist, resdic,CHECKSEC_INFO) 
+		# symbolization 이 안된 것들은 쓰레기통으로 보낸다.
+		logging("now lfunc_change_callweirdaddress_2_callXXX")
+		for SectionName in CodeSections_WRITE:
+			if SectionName in resdic.keys():
+				lfunc_change_callweirdaddress_2_callXXX(resdic[SectionName])
+		logging("now lfunc_change_callweirdaddress_2_data")
+		for SectionName in CodeSections_WRITE:
+			if SectionName in resdic.keys():
+				lfunc_change_callweirdaddress_2_data(resdic[SectionName])
+	
 
-	# symbolization 이 안된 것들은 쓰레기통으로 보낸다. TODO: crash based design에서는 이렇게 해줄 필요 없음. 패치필요.
-	logging("now lfunc_change_callweirdaddress_2_callXXX")
-	for SectionName in CodeSections_WRITE:
-		if SectionName in resdic.keys():
-			lfunc_change_callweirdaddress_2_callXXX(resdic[SectionName])
-	logging("now lfunc_change_callweirdaddress_2_data")
-	for SectionName in CodeSections_WRITE:
-		if SectionName in resdic.keys():
-			lfunc_change_callweirdaddress_2_data(resdic[SectionName])
 	
 
 	# 링킹된 함수에서 비어있는 레지스터자리 채워주기. ex) call stderror@GOT(REGISTER_WHO)로 blank로 심볼리제이션된거 resdic[3]을 참조해서 레지스터자리 채워준다.
 	logging("now fill_blanked_symbolname_toward_GOTSECTION")
 	fill_blanked_symbolname_toward_GOTSECTION(resdic)
-                                                                                                                                                                     
-	# 링킹된 글로벌데이터 이름을 망가뜨린다. ex) stderr 를 MYSYM_stderr로 바꿔버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도 된다)
-	logging("now not_global_symbolize_ExternalLinkedSymbol")
-	not_global_symbolize_ExternalLinkedSymbol(resdic)
+                   
+
 
 	# 재조립 바이너리에서의 GOT를 얻어오는(필요할지도 모르므로) 루틴을 생성자배열에 추가.
 	logging("now add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array")
@@ -180,11 +202,29 @@ if __name__=="__main__":
 
 	# 크래시핸들러 관련 루틴. 구현중
 	if options.testingcrashhandler is True:
-		# 모든메모리참조 전에 레지스터 컨텍스트 백업
-		add_someprefix_before_all_memory_reference(resdic)
+		# 외부라이브러리 콜 (휴리스틱)
+		logging("now symbolize_crashhandler_externalfunctioncall_heuristically")
+		symbolize_crashhandler_externalfunctioncall_heuristically(resdic)
+
+
+		# 외부라이브러리 콜 
+		logging("now symbolize_crashhandler_externalfunctioncall")
+		symbolize_crashhandler_externalfunctioncall(resdic)
+
+
+		# 세그먼트레지스터 관련 메모리참조연산앞에도 똑같이 백업한다. 
+		logging("now symbolize_crashhandler_segmentregister_1")
+		symbolize_crashhandler_segmentregister_1(resdic)
+
+		logging("now symbolize_crashhandler_segmentregister_2")
+		symbolize_crashhandler_segmentregister_2(resdic)
+
 		
-		# 마찬자지로 립씨함수같은거 앞에도 똑같이 백업한다
-		add_someprefix_before_all_external_functioncall(resdic)
+		# 모든메모리참조 전에 레지스터 컨텍스트 백업 COMMENT: 세그먼트 레지스터관련해서 먼저 백업해줘야 한다. 왜냐하면 세그먼트레지스터 관련 인스트럭션에는 strict한  prerequisite 가 있기때문.(반드시 %esi를 써야한다던가...)
+		# symbolize_crashhandler_allmemref
+		logging("now symbolize_crashhandler_allmemref")
+		symbolize_crashhandler_allmemref(resdic)
+
 
 		# 모든라인에 심볼화
 		symbolize_alllines(resdic) 
@@ -196,7 +236,21 @@ if __name__=="__main__":
 		
 		# getpcthunk 가 원본주소를 리턴하도록 한다. (크래시-친화적-디자인)
 		getpcthunk_to_returnoriginalADDR(resdic)
+		
 	
+
+
+
+    # 링킹된 글로벌데이터 이름을 망가뜨린다. ex) stderr 를 MYSYM_stderr로 바꿔버린다. (심볼이 붙어있음 == 이름이 의미가 있음 == 링커가 알아서해주는 심볼임 == 없애도 된다) COMMENT: 이 함수는 심볼화다음에 불러야한다. testingcrashhandler 에서 심볼에붙은 이름을 기준으로 '심볼in바이너리'를 리턴할지, 아니면 '_IO_stdin_used'같은 링킹타임에 생성되는 심볼을 리턴할지를 결정하기 때문이다. 
+	logging("now not_global_symbolize_ExternalLinkedSymbol")
+	not_global_symbolize_ExternalLinkedSymbol(resdic)
+
+
+
+
+
+
+
 
 
 
