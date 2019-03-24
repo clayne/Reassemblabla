@@ -1,1 +1,0 @@
-gcc -o ex_reassemblable ex_reassemblable.s -m32  /lib/i386-linux-gnu/libc.so.6 

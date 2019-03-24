@@ -125,6 +125,7 @@ if __name__=="__main__":
 	# 일반 심볼 심볼라이즈
 	logging("now symbolize_textsection")
 	symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
+	
 	logging("now symbolize_datasection")
 	symbolize_datasection(resdic)
 

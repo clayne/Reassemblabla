@@ -348,8 +348,11 @@ p_PATTERN_05.append(re.compile(' lodsw'    ))
 p_PATTERN_05.append(re.compile(' mfence'   )) 
 p_PATTERN_05.append(re.compile(' monitor'  ))  
 p_PATTERN_05.append(re.compile(' movsb'    ))
+p_PATTERN_05.append(re.compile(' movzb'    ))
 p_PATTERN_05.append(re.compile(' movsw'    ))
+p_PATTERN_05.append(re.compile(' movzw'    ))
 p_PATTERN_05.append(re.compile(' movsd'    ))
+p_PATTERN_05.append(re.compile(' movzd'    ))
 p_PATTERN_05.append(re.compile(' mwait'    ))
 p_PATTERN_05.append(re.compile(' nop'      ))
 p_PATTERN_05.append(re.compile(' outsb'    ))
@@ -405,7 +408,8 @@ p_bracket = re.compile('\<.*?\>')
 
 # COMMENT: 1000 이 곱해져있는경우는, n번째 파라미터부터 쭉- 무한대까지 심볼라이즈를 해준다.
 # COMMENT: jmp 로 라이브러리함수를 호출한다면, '__fprintf_chk':[4000] 이렇게 파라미터자리가 한칸 +된다.
-symbolize_heuristic_list_call = {'__cxa_atexit':[1], '__printf_chk':[2000], '__fprintf_chk':[3000], 'strlen':[1], 'qsort':[1,4]}
-symbolize_heuristic_list_jmp  = {'__cxa_atexit':[2], '__printf_chk':[3000], '__fprintf_chk':[4000], 'strlen':[2], 'qsort':[2,5]}
+symbolize_heuristic_list_call = {'__cxa_atexit':[1], '__printf_chk':[2000], '__fprintf_chk':[3000], 'qsort':[1,4], '__lxstat64':[2], '__xstat64':[2], 'error':[3000], 'getopt_long':[3,4], 'read':[2], 'openat64':[2], 'strlen':[1], 'strchr':[1], 'strrchr':[1], 'strchrnul':[1], 're_compile_pattern':[1,3]}
+symbolize_heuristic_list_jmp  = {'__cxa_atexit':[2], '__printf_chk':[3000], '__fprintf_chk':[4000], 'qsort':[2,5], '__lxstat64':[3], '__xstat64':[3], 'error':[4000], 'getopt_long':[4,5], 'read':[3], 'openat64':[3], 'strlen':[2], 'strchr':[2], 'strrchr':[2], 'strchrnul':[2], 're_compile_pattern':[2,4]}
 
-# 아아,,, 
+symbolize_heuristic_list_call_multidemension = {'sigaction':[2]}
+symbolize_heuristic_list_jmp_multidemension  = {'sigaction':[3]}

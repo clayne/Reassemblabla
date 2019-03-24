@@ -19,7 +19,7 @@ def symbolize_alllines(resdic):
 def setup_some_useful_stuffs_for_crashhandler(resdic): # 레지스터 백업함수를 셋업한다.
 	asm_stuffs = '''
 .lcomm MYSYM_EIP, 4 
-.lcomm MYSYM_EXITADDR, 4
+.lcomm MYSYM_MYEXITADDR, 4
 .lcomm MYSYM_ESP, 4 
 .lcomm MYSYM_STACKLOC, 4
 .lcomm MYSYM_CRASHADDR, 4
@@ -29,6 +29,7 @@ def setup_some_useful_stuffs_for_crashhandler(resdic): # 레지스터 백업함�
 
 .lcomm MYSYM_LIBFLAG, 4
 .lcomm MYSYM_DUMMY, 4
+.lcomm MYSYM_CRASHCOUNTER, 4
 
 .lcomm MYSYM_EFLAGS, 4
 .lcomm MYSYM_EAX, 4
@@ -68,13 +69,17 @@ MYSYM_restoreregistercontext:
 	asm_exit = '''
 #+++++
 # crash handler 를 거쳐서도 해결안되는 심볼.. 즉, 애초부터 세그폴의 운명이였던 놈은 이곳으로 탈출해라.....
-MYSYM_EXIT: 
+MYSYM_MYEXIT: 
 	# movl $0x1, %eax
 	# movl $0x3, %ebx
 	# int $0x80
-	mov MYSYM_EXITADDR, %eax
+	mov MYSYM_MYEXITADDR, %eax
 	mov %eax, 0xdc(%esp)              
 	ret 	
+MYSYM_EXIT:
+	movl $0x1, %eax
+	movl $0x3, %ebx
+	int $0x80
 '''
 
 	noaddr = 0xf0000000
@@ -142,8 +147,7 @@ def addRoutineToInstallSignalHandler_in_init_array(resdic):
 											'']
 
 
-
-def piece_asm_block(addr, nextpiecename, count, symbolname):
+def return_crashhandler_block(addr, nextpiecename, count, symbolname):
 	isitgotbased = 'no'
 	if 'REGISTER_WHO' in symbolname:
 		symbolname = symbolname.replace('REGISTER_WHO','%edx') # 이제 _progname@GOT(%edx) 으로바꾼당. 
@@ -158,6 +162,10 @@ def piece_asm_block(addr, nextpiecename, count, symbolname):
 	asm_block  += 		' jne MYSYM_CRASHHANDLER_ORIG_%s' 				+ ' ' + '#+++++' + '\n' 
 	
 	# 라이브러리 크래시 - 스택 픽싱
+	asm_block  +=    	' add $0x1, MYSYM_CRASHCOUNTER'					+ ' ' + '#+++++' + '\n' # 카운터에 1더해라. 
+	asm_block  +=       ' cmpl $0x100, MYSYM_CRASHCOUNTER'				+ ' ' + '#+++++' + '\n' # 100 회 이상 여기에 계속뛴다면 EXIT으로가라.
+	asm_block  += 		' je MYSYM_EXIT'								+ ' ' + '#+++++' + '\n'
+
  	asm_block  += 		' mov MYSYM_ESP, %%ebx'							+ ' ' + '#+++++' + '\n'
 	asm_block  += 		' sub $0x4, %%ebx'								+ ' ' + '#+++++' + '\n'
 	asm_block  +=  		' mov $0x200, %%ecx'							+ ' ' + '#+++++' + '\n'
@@ -263,7 +271,7 @@ def setupsignalhandler(resdic):
 				nextpiecename = SYMPREFIX[0] + 'MYSYM_CRASHHANDLER_' + str(count + 1)
 				CRASHHANDLER[addr_crashhandler] = [
 									  'MYSYM_CRASHHANDLER_' + str(count) + ':', 		# resolver의 각 항은 jne linked list 로 이어져 있다. 
-									  [piece_asm_block(addr, nextpiecename, count, symbolname)],
+									  [return_crashhandler_block(addr, nextpiecename, count, symbolname)],
 									  '', 												# 주석자리. 노필요
 									  ''  												# PIE관련정보 자리. 노필요.
 									  ]
@@ -272,7 +280,7 @@ def setupsignalhandler(resdic):
 	
 	CRASHHANDLER[addr_crashhandler] = [													# 크래시핸들러 링크의 끝 : 자살! URGENT: 이거를 그냥 마지막에는 MYSYM_EIP 로 리턴하도록 디자인하면 어떨까?
 						  'MYSYM_CRASHHANDLER_' + str(count) + ':', 	
-						  ['jmp MYSYM_EXIT #+++++'],
+						  ['jmp MYSYM_MYEXIT #+++++'],
 						  '',
 						  ''  
 						  ]    
@@ -303,8 +311,6 @@ def symbolize_crashhandler_allmemref(resdic): # TODO: lea __procname@GOT(REGISTE
 				continue
 
 
-
-
 			# [01] 거르는 인스트럭션
 			itisbranch = False
 			if DISASM.startswith('j') or DISASM.startswith(' j') or DISASM.startswith('call') or DISASM.startswith(' call'):
@@ -330,9 +336,10 @@ def symbolize_crashhandler_allmemref(resdic): # TODO: lea __procname@GOT(REGISTE
 			# MEMREF 관련 거르는 인스트럭션 1 : esp 메모리에 대한 참조연산은 크래시 절대안나는 연산이므로 제외한다. --> 아니다. 스택을 이용한 이중참조가 있을 수 있다. ex) call 0x12(%esp)의 경우, 0x0804100을 호출하므로 valid한 인스트럭션이다.
 			if '%esp' in MEMREF and itisbranch is False: # mov 0x12(%esp), %ebx 같은 연산이라면 패스
 				continue 
+			'''
 			if '%ebp' in MEMREF and itisbranch is False:
 				continue
-
+			'''
 			# MEMREF 관련 거르는 인스트럭션 2 : 이미 심볼화된것들은 거른다
 			alreadySymbolized = 1
 			for r in GENERAL_REGISTERS: # general register 가 하나라도 있어야 살려줄것이다. (call main, call __libc_start_main 이런거 제외하기 위함)
@@ -550,7 +557,7 @@ def symbolize_crashhandler_segmentregister_2(resdic):
 			for _segment_instruction in ['movs','cmps']: # ['movs','outs','ins','cmps'] COMMENT: ins, outs 의 형태는 insb (%ds), %es:(%edi) 가 된다. 그런데 1. (%ds)는 port를 의미한다는데, 크래시위험이 없음. 이미셋팅된값을 의미하기때문 / 또한 캡스톤에서 버그가 잇는데 insb %ds, %es:(%edi) 로 잘못 디스어셈블한다는 점. 따라서 symbolize_crashhandler_segmentregister_1 로 보내자. 
 				if _instruction.startswith(_segment_instruction):
 					target_instruction = 'yes'
-			if _instruction.startswith('movsbl') or _instruction.startswith('movswl') or _instruction.startswith('movsbw'): # movsbl(==movzbl) 은 다른인스트럭션이므로 예외처리. (메모리(source)에서 UNSigned single byte 읽어와가지고 그 읽어온값을 레지스터(destination)에다가 넣는다.) 
+			if _instruction.startswith('movsbl') or _instruction.startswith('movzbl') or _instruction.startswith('movswl') or _instruction.startswith('movzwl') or _instruction.startswith('movsbw') or _instruction.startswith('movszw'): # movsbl(==movzbl) 은 다른인스트럭션이므로 예외처리. (메모리(source)에서 UNSigned single byte 읽어와가지고 그 읽어온값을 레지스터(destination)에다가 넣는다.) 
 				target_instruction = 'no' 
 
 			if target_instruction is 'no':
@@ -566,9 +573,8 @@ def symbolize_crashhandler_segmentregister_2(resdic):
 
 			NEWDISASM  = []	
 			NEWDISASM.append('')
-			NEWDISASM.append(' # symbolize_crashhandler_segmentregister_2' 		+ ' ' + '#+++++')
-			NEWDISASM.append(' pushal' 															+ ' ' + '#+++++') 
-			NEWDISASM.append(' pushf' 															+ ' ' + '#+++++') 
+			NEWDISASM.append(' # symbolize_crashhandler_segmentregister_2'				 		+ ' ' + '#+++++')
+			NEWDISASM.append(' call MYSYM_backupregistercontext' 								+ ' ' + '#+++++') 
 			NEWDISASM.append(' mov %esp, MYSYM_ESP'												+ ' ' + '#+++++') 
 			NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'										+ ' ' + '#+++++')
 
@@ -582,7 +588,7 @@ def symbolize_crashhandler_segmentregister_2(resdic):
 
 			NEWDISASM.append(' push $MYSYM_RETURNTOHERE_SEG2_LEFT_' + str(count) 				+ ' ' + '#+++++') # EIP 설정 
 			NEWDISASM.append(' pop MYSYM_EIP' 													+ ' ' + '#+++++') 
-			
+
 			NEWDISASM.append('MYSYM_RETURNTOHERE_SEG2_LEFT_' + str(count) + ':'  				+ ' ' + '#+++++') 
 			NEWDISASM.append(' mov MYSYM_CRASHADDR,   %eax'										+ ' ' + '#+++++') 
 			NEWDISASM.append(' mov (%eax), %eax'												+ ' ' + '#+++++') # >>>CRASH<<<
@@ -602,14 +608,14 @@ def symbolize_crashhandler_segmentregister_2(resdic):
 			NEWDISASM.append(' mov (%eax), %eax'												+ ' ' + '#+++++') # >>>CRASH<<<
 			NEWDISASM.append(' push MYSYM_CRASHADDR'											+ ' ' + '#+++++')
 			NEWDISASM.append(' pop MYSYM_CRASHADDR_RIGHT'										+ ' ' + '#+++++')
-			
+
+			NEWDISASM.append(' call MYSYM_restoreregistercontext'								+ ' ' + '#+++++')
 			NEWDISASM.append(' mov MYSYM_ESP, %esp'												+ ' ' + '#+++++')
-			NEWDISASM.append(' popf'															+ ' ' + '#+++++')
-			NEWDISASM.append(' popal'															+ ' ' + '#+++++')
-			
+
+
+
 			NEWDISASM.append(' mov MYSYM_CRASHADDR_LEFT, '    + MEMREF_1_REG					+ ' ' + '#+++++')
 			NEWDISASM.append(' mov MYSYM_CRASHADDR_RIGHT, '   + MEMREF_2_REG					+ ' ' + '#+++++')
-			
 			# 원본 디스어셈블리를 붙여준다.
 			resdic['.text'][addr][1] = resdic['.text'][addr][1][:j] + NEWDISASM + resdic['.text'][addr][1][j:]
 			count = count+1	
@@ -667,7 +673,8 @@ def symbolize_crashhandler_externalfunctioncall(resdic):
 			NEWDISASM.append(' call MYSYM_backupregistercontext'							+ ' ' + '#+++++') 
 			NEWDISASM.append(' mov %esp, MYSYM_ESP'											+ ' ' + '#+++++') 
 			# [02] 플래그같은거 설정해줌
-			NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_EXITADDR'			 		+ ' ' + '#+++++') # 라이브러리 콜부를 MYSYM_EXITADDR 에다가 저장한다.
+			NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_MYEXITADDR'			 		+ ' ' + '#+++++') # 라이브러리 콜부를 MYSYM_MYEXITADDR 에다가 저장한다.
+			NEWDISASM.append(' movl $0x0, MYSYM_CRASHCOUNTER'								+ ' ' + '#+++++')
 			# [03] 여기서부터 크래시핸들러 관련된것 설정
 			NEWDISASM.append(' movl $' + symbolname1 + ', MYSYM_EIP'						+ ' ' + '#+++++') # 플래그는 항상 크래시 핸들러 호출하기 전에 설정한다. 크래시핸들러 한번 들어갔다나오면 0으로 초기화되므로
 			NEWDISASM.append(symbolname1 + ':'  											+ ' ' + '#+++++') 
@@ -718,7 +725,6 @@ def getpcthunk_to_returnoriginalADDR(resdic):
 					resdic[sectionName][addr][1][0] = resdic[sectionName][addr][1][0].replace('0(%esp)','MYSYM_EIP').replace('(%esp)','MYSYM_EIP') # 원본 : movl 0(%esp), %ebx , 바뀐후 : movl MYSYM_EIP, %ebx
 
 
-
 def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리스틱 픽싱할때는, LIBFLAG를 설정해주면 안됨. 왜냐하면 크래시핸들러가 스택을 직접바꾸는게 아니라, 아래의 인스트루멘테이션 된 인스트럭션에서 CRASHADDR를 이용해서 스택을 손봐주기 때문에.
 
 	origindexlist = pickpick_idx_of_orig_disasm(resdic_text[ADDR][1]) 
@@ -734,9 +740,9 @@ def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리
 	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'												+ ' ' + '#+++++')
 
 	# [02] 플래그같은거 설정해줌 
-	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_EXITADDR' 							+ ' ' + '#+++++') 
+	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_MYEXITADDR' 							+ ' ' + '#+++++') 
 	for paramnum in nst_param_list:
-		if paramnum > 1000: # 뒤로 쭉 반복된다는 뜻이다. 그 파라미터부터 for문으로 크래시쭉쭉 발생시키면서 핸들링하자. paramnum/1000 부터 크래시핸들러가 더이상 할일이없어서 MYSYM_EXITADDR 로 리턴할때까지 계-속 스택픽싱을 반복한다. 
+		if paramnum > 1000: # 입력 파라미터가 몇개인지 모른다. n번째부터 n+???개의 파라미터를 심볼화해줘야 한다는 뜻.
 			paramnum = paramnum/1000
 			LOC_ESP   = '{}(%esp)'.format(hex(4*(paramnum - 1))) 
 			symbolname1 = 'MYSYM_FORLOOP_' + hex(ADDR) 
@@ -749,7 +755,7 @@ def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리
 			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
 
 			NEWDISASM.append(symbolname1 + ':'												+ ' ' + '#+++++')
-			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 만약에 크래시핸들러가 EXIT갈때까지갔다면, MYSYM_EXIT 에서는 바로 라이브러리콜하는곳으로 간당.
+			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 만약에 크래시핸들러가 EXIT갈때까지갔다면, MYSYM_MYEXIT 에서는 바로 라이브러리콜하는곳으로 간당.
 			
 			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # esi (%esp 대체품) 에서부터 쫄쫄 올라가면서 스택픽싱한당.
 			NEWDISASM.append(' mov (%esi), %eax' 											+ ' ' + '#+++++')
@@ -793,10 +799,98 @@ def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리
 	NEWDISASM.append(' call MYSYM_restoreregistercontext'								  	+ ' ' + '#+++++') # 레지스터컨텍스트 백업
 	NEWDISASM.append(resdic_text[ADDR][1][j]												+ ' ' + '#+++++') # COMMENT: 왜 원본디스어셈블리인데도 #+++++ 추가해주냐면? --> symbolize_crashhandler_externalfunctioncall 에서 처리해주지 말라고. 
 
-
-
 	resdic_text[ADDR][1]  = resdic_text[ADDR][1][:j] + NEWDISASM + resdic_text[ADDR][1][j+1:]
 
+
+def heuristic_stack_fixing_multidemension(resdic_text, ADDR, nst_param_list, demension):
+
+	origindexlist = pickpick_idx_of_orig_disasm(resdic_text[ADDR][1]) 
+	j = 0
+	NEWDISASM = []
+	symbolname0 = 'MYSYM_LIBCALL_' + hex(ADDR)
+
+	# [01] 가장급한건 컨텍스트 저장
+	NEWDISASM.append('')
+	NEWDISASM.append(' # heuristic_stack_fixing_multidemension' 							+ ' ' + '#+++++')
+	NEWDISASM.append(' call MYSYM_backupregistercontext' 									+ ' ' + '#+++++') 
+	NEWDISASM.append(' mov %esp, MYSYM_ESP'													+ ' ' + '#+++++') 
+	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'											+ ' ' + '#+++++')
+
+	# [02] 플래그같은거 설정해줌 
+	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_MYEXITADDR' 							+ ' ' + '#+++++') 
+	for paramnum in nst_param_list:
+		if paramnum > 1000: # 입력 파라미터가 몇개인지 모른다. n번째부터 n+???개의 파라미터를 심볼화해줘야 한다는 뜻. 
+			paramnum = paramnum/1000
+			LOC_ESP   = '{}(%esp)'.format(hex(4*(paramnum - 1))) 
+			symbolname1 = 'MYSYM_FORLOOP_' + hex(ADDR) 
+			symbolname2 = 'MYSYM_PARAMINFI_' + hex(ADDR)  
+			symbolname3 = 'MYSYM_DEMENSIONFIX_' + hex(ADDR)
+			# URGENT: 이거 아래else참고해서 멀티디멘션 반영한 코드로 바꾸기
+			# n~ 번째 파라미터에 대한 스택픽싱을 설치한당.
+			NEWDISASM.append('')
+			NEWDISASM.append(' # ' + ' ∞st stack fixing... : ' + LOC_ESP	  			    + ' ' + '#+++++')
+			NEWDISASM.append(' lea ' + LOC_ESP + ', %esi'									+ ' ' + '#+++++') # 현재스택의위치 저장
+
+			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+			NEWDISASM.append(symbolname1 + ':'												+ ' ' + '#+++++')
+			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 만약에 크래시핸들러가 EXIT갈때까지갔다면, MYSYM_MYEXIT 에서는 바로 라이브러리콜하는곳으로 간당.
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # esi (%esp 대체품) 에서부터 쫄쫄 올라가면서 스택픽싱한당.
+			NEWDISASM.append(' mov (%esi), %eax' 											+ ' ' + '#+++++')
+
+			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 									+ ' ' + '#+++++') # 1
+			NEWDISASM.append( symbolname2 + ':'									 			+ ' ' + '#+++++') # 2 컴백은 여기로.
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 									+ ' ' + '#+++++') # 3 값읽기 : 스택 -> %eax 
+
+			NEWDISASM.append(' mov (%eax), %ebx'											+ ' ' + '#+++++') # 크래시유발 (%eax 의 유효성검증)
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++')
+			NEWDISASM.append(' mov %eax, (%esi)' 											+ ' ' + '#+++++')
+			NEWDISASM.append(' add $0x4, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+
+			NEWDISASM.append(' jmp ' + symbolname1 											+ ' ' + '#+++++')
+
+		else:
+			LOC_ESP  = '{}(%esp)'.format(hex(4*(paramnum - 1))) # 첫번째 파라미터라면 esp+0, 두번째 파라미터라면 esp+4, ...
+			symbolname1 = 'MYSYM_PARAM' + str(paramnum) + '_' +  hex(ADDR)
+			symbolname3 = 'MYSYM_DEMENSIONFIX_' + hex(ADDR)
+
+			# n번째 파라미터에 대한 스택픽싱을 설치한당.
+			NEWDISASM.append('')
+			
+
+			NEWDISASM.append('')
+			NEWDISASM.append(' # ' + str(paramnum) + 'st stack fixing... : ' + LOC_ESP		+ ' ' + '#+++++')	
+			NEWDISASM.append(' lea ' + LOC_ESP + ', %esi' 								  	+ ' ' + '#+++++') 
+			
+			NEWDISASM.append(' movl $' + symbolname1 +', MYSYM_EIP' 						+ ' ' + '#+++++')
+			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
+			NEWDISASM.append(' mov (%esi), %eax'											+ ' ' + '#+++++')
+			NEWDISASM.append(' mov %eax, MYSYM_CRASHADDR' 									+ ' ' + '#+++++') # 0x0(esp) 를 MYSYM_CRASHADDR 에다가 옮긴다. 
+			NEWDISASM.append( symbolname1 + ':'  			  								+ ' ' + '#+++++') # 크래시난다면 여기로 돌아와. 이 딱 중간이여야해. 
+			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 									+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov (%eax), %ebx'											+ ' ' + '#+++++') # 크래시유발
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # Fixing 된 주소를 0x0(esp) 에다가 넣는다 
+			NEWDISASM.append(' mov %eax, (%esi)'											+ ' ' + '#+++++')
+
+			# 디멘션픽싱 (esi -> eax -> ebx -> ecx) 이 순으로 읽어왔음. 
+			for d in xrange(demension - 1):
+				NEWDISASM.append(' movl $' + symbolname3 + str(d) +', MYSYM_EIP'		+ ' ' + '#+++++')
+				NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'							+ ' ' + '#+++++')
+				NEWDISASM.append(' mov %eax, MYSYM_STACKLOC'							+ ' ' + '#+++++') # MYSYM_STACKLOC은 문제가되는값이 들어가있는 주소를 의미
+				NEWDISASM.append(' mov (%eax), %ebx'									+ ' ' + '#+++++') # 한번 더 차원을 감소시킴
+				NEWDISASM.append(' mov %ebx, MYSYM_CRASHADDR'							+ ' ' + '#+++++')
+				NEWDISASM.append( symbolname3 + str(d) + ':'							+ ' ' + '#+++++')
+				NEWDISASM.append(' mov MYSYM_CRASHADDR, %ebx'							+ ' ' + '#+++++')
+				NEWDISASM.append(' mov (%ebx), %ecx'									+ ' ' + '#+++++')
+				NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'							+ ' ' + '#+++++')
+				NEWDISASM.append(' mov %ebx, (%esi)'									+ ' ' + '#+++++')
+
+	NEWDISASM.append('')
+	NEWDISASM.append(symbolname0 + ':'														+ ' ' + '#+++++') 
+	NEWDISASM.append(' mov MYSYM_ESP, %esp'											      	+ ' ' + '#+++++') # esp 복구
+	NEWDISASM.append(' call MYSYM_restoreregistercontext'								  	+ ' ' + '#+++++') # 레지스터컨텍스트 백업
+	NEWDISASM.append(resdic_text[ADDR][1][j]												+ ' ' + '#+++++') # COMMENT: 왜 원본디스어셈블리인데도 #+++++ 추가해주냐면? --> symbolize_crashhandler_externalfunctioncall 에서 처리해주지 말라고. 
+
+	resdic_text[ADDR][1]  = resdic_text[ADDR][1][:j] + NEWDISASM + resdic_text[ADDR][1][j+1:]
 
 
 # destinations = VSA_and_extract_addr(DISASM) 
@@ -815,17 +909,20 @@ def symbolize_crashhandler_externalfunctioncall_heuristically(resdic):
 						if funcname in symbolize_heuristic_list_call.keys(): # 이 함수에 hit 하면은 , 이함수에 push로 전달되는 n번째 파라미터를 심볼화한다
 							nst_param_list = symbolize_heuristic_list_call[funcname]
 							heuristic_stack_fixing(resdic[sectionName],ADDR, nst_param_list)
+						
+						elif funcname in symbolize_heuristic_list_call_multidemension.keys():
+							nst_param_list = symbolize_heuristic_list_call_multidemension[funcname]
+							heuristic_stack_fixing_multidemension(resdic[sectionName],ADDR, nst_param_list, 2)
+
 					elif DISASM.startswith('j') or DISASM.startswith(' j'):
 						funcname = DISASM.strip().split()[1]
 						if funcname in symbolize_heuristic_list_jmp.keys(): # 이 함수에 hit 하면은 , 이함수에 push로 전달되는 n번째 파라미터를 심볼화한다
 							nst_param_list = symbolize_heuristic_list_jmp[funcname]
 							heuristic_stack_fixing(resdic[sectionName],ADDR, nst_param_list)
+						
+						elif funcname in symbolize_heuristic_list_jmp_multidemension.keys():
+							nst_param_list = symbolize_heuristic_list_jmp_multidemension[funcname]
+							heuristic_stack_fixing_multidemension(resdic[sectionName],ADDR, nst_param_list, 2)
 
 	
-
-
-
-
-
-
 

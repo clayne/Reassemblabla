@@ -1,2 +1,0 @@
-as -o ex_pie_reassemblable.o ex_pie_reassemblable.s
-ld -o ex_pie_reassemblable -dynamic-linker /lib/ld-linux.so.2  /usr/lib/i386-linux-gnu/crti.o -lc ex_pie_reassemblable.o /usr/lib/i386-linux-gnu/crtn.o
