@@ -422,12 +422,15 @@ def transform_byte2dword(resdic, section_from, addr):
 	
 
 def get_r_386_relative(filename, resdic):
+	import pdb
+	pdb.set_trace()
 	
-	#TODO: check R_386_32
-	TYPES = {'R_386_RELATIVE':8, 'R_386_GLOB_DAT':6, 'R_386_32':1}
+	
+	TYPES = {'R_386_RELATIVE':8, 'R_386_GLOB_DAT':6}
 	bin = ELFFile(open(filename,'rb'))
 
 	symTab = get_symbol_tables(bin)	
+	pdb.set_trace()
 
 	relative_set = set()
 	got_dict = dict()
@@ -438,43 +441,14 @@ def get_r_386_relative(filename, resdic):
 			for rel in section.iter_relocations():
 				if rel['r_info_type'] == TYPES['R_386_RELATIVE']:
 					relative_set.add(rel['r_offset'])
-				elif rel['r_info_type'] == TYPES['R_386_GLOB_DAT'] :
-					#.got
+				if rel['r_info_type'] == TYPES['R_386_GLOB_DAT']:
 					symIdx = rel['r_info_sym'] 
 					symName = str(symTab[symIdx]) #+ '@GOT'
 					rOffset = rel['r_offset']
-					if symName not in ['__gmon_start__', '_ITM_deregisterTMCloneTable',
-							'_Jv_RegisterClasses', '_ITM_registerTMCloneTable']:
-
-						resdic['.got'].pop(rOffset+3)
-						resdic['.got'].pop(rOffset+2)
-						resdic['.got'].pop(rOffset+1)
-						resdic['.got'][rOffset][1][0] = " .long " + symName 
-						resdic['.got'][rOffset][0] = 'MYSYM_GOT_' + symName + ':'
-
-						got_dict[rOffset] = resdic['.got'][rOffset][0][:-1]
-				
-				elif  rel['r_info_type'] == TYPES['R_386_32']:
-					#.got
-					symIdx = rel['r_info_sym'] 
-					symName = str(symTab[symIdx]) #+ '@GOT'
-					rOffset = rel['r_offset']
-					for item in ['.data','.data.rel.ro']:
-						if rOffset in resdic[item].keys():
-							section = item
-							break
-
-					resdic[section].pop(rOffset+3)
-					resdic[section].pop(rOffset+2)
-					resdic[section].pop(rOffset+1)
-					resdic[section][rOffset][1][0] = " .long " + symName 
-					resdic[section][rOffset][0] = 'MYSYM_GOT_' + symName + ':'
-
-					got_dict[rOffset] = resdic[section][rOffset][0][:-1]
-
-				else:		
-					abort()
-				
+					if synName not in ['___gmon_start__']:
+						got_dict[rOffset] = symName
+	import pdb
+	pdb.set_trace()	
 	got_base = min(resdic['.got.plt'].keys())
 	for addr in resdic['.plt.got'].keys():
 		DISA = resdic['.plt.got'][addr][1][0]
@@ -483,11 +457,8 @@ def get_r_386_relative(filename, resdic):
 			continue
 		roffset = res[0]
 		got_addr = got_base + int(roffset, 16)
-		if got_addr not in got_dict.keys():
-			continue
-		symName = got_dict[got_addr] + '@GOTOFF'
-		NEW_DISA = resdic['.plt.got'][addr][1][0].replace(roffset, symName)
-		resdic['.plt.got'][addr][1][0] = NEW_DISA
+		symName = got_dict[got_addr]
+		resdic['.plt.got'][addr][0] = symName + ':'
 			
 
 

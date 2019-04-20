@@ -5,6 +5,7 @@ import re
 # 섹션 선언
 CodeSections_WRITE = ['.text','.init','.fini', '.ctors', '.dtors', '.plt.got','.plt']
 DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata','.got.plt'] # <.jcr> added for handling pie binary.
+DataSections_WRITE = ['.data','.rodata','.bss','.init_array','.fini_array','.got', '.jcr', '.data1', '.rodata1', '.tbss', '.tdata','.got.plt','.data.rel.ro'] # <.jcr> added for handling pie binary.
 AllSections_WRITE  = CodeSections_WRITE + DataSections_WRITE
 
 # 아래 섹션들은 text/data 섹션으로써 디스어셈블리에 쓰인다

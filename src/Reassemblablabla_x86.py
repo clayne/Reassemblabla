@@ -26,6 +26,7 @@ if __name__=="__main__":
 	parser.add_option("-s", "--shrinksize", dest="shrinksize", help="shrink output binary size by disignate local symbol", action="store_true")
 	parser.add_option("", "--usesymboltable", dest="usesymboltable", help="generated comment depending on existing symbol table", action="store_true") # for BiOASAN
 	parser.add_option("", "--testing", dest="testingcrashhandler", help="now testing about crashhandler relative features... hope it works without any issues.", action="store_true")
+	parser.add_option("", "--PIC", dest="pic", help="now generating PIC assembly", action="store_true")
 	
 	parser.set_defaults(verbose=True)
 	(options, args) = parser.parse_args()
@@ -94,14 +95,14 @@ if __name__=="__main__":
 	T_plt2name = got2name_to_plt2name(T_rel['STT_FUNC'], CHECKSEC_INFO, resdic)
 
 
+
 	# 심볼이름 레이블링. 레이블링 순서는 휘발성이강하고(weak) 국소적인 이름부터한다. 1. Relocation section table 2. Weak symbol 3. Global symbol
 	logging("now dynamic_symbol_labeling...")
 	dynamic_symbol_labeling(resdic, T_plt2name) 
 	dynamic_symbol_labeling(resdic, T_rel['STT_OBJECT']) 
 	# dynamic_symbol_labeling(resdic, T_rel['STT_NOTYPE']) # STT_NOTYPE 은 심볼화해주면 컴파일이 안된다. 주의.
 
-
-
+	
 	# main 을 찾는다.
 	__libc_start_main_addr = -1
 	for addr in T_plt2name.keys():
@@ -122,27 +123,20 @@ if __name__=="__main__":
 	logging("now getpcthunk_labeling")
 	pcthunk_reglist = getpcthunk_labeling(resdic)
 
-	# 일반 심볼 심볼라이즈
-	logging("now symbolize_textsection")
-	symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
-	
-	logging("now symbolize_datasection")
-	symbolize_datasection(resdic)
-
-	# 에뮬레이션을 이용한 심볼라이즈
-	logging("now PIE_set_getpcthunk_loc")
-	PIE_set_getpcthunk_loc(resdic) # 주의: get_pc_thunk를 호출하는지안하는지는 symbolize_textsection 을 거친후에야 알수있다. 함수 호출순서가 항상 뒤에오도록 신경써줄 것
-	
 
 
+	if not options.pic:
+		# 일반 심볼 심볼라이즈
+		logging("now symbolize_textsection")
+		symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
+		
+		logging("now symbolize_datasection")
+		symbolize_datasection(resdic)
 
-
-
-
-
-
-	logging("now emulation")
-	emulation(resdic, options.testingcrashhandler)
+		# 에뮬레이션을 이용한 심볼라이즈
+		logging("now PIE_set_getpcthunk_loc")
+		PIE_set_getpcthunk_loc(resdic) # 주의: get_pc_thunk를 호출하는지안하는지는 symbolize_textsection 을 거친후에야 알수있다. 함수 호출순서가 항상 뒤에오도록 신경써줄 것
+		
 
 
 
@@ -151,37 +145,61 @@ if __name__=="__main__":
 
 
 
-	
-	# 휴리스틱을 이용한 심볼라이즈 (GOT 베이스로 데이터에 접근하는 경우 휴리스틱 이용)
-	if options.testingcrashhandler is True: # Crash based 디자인에서는 필요없음
-		'nothing to do'
+		logging("now emulation")
+		emulation(resdic, options.testingcrashhandler)
+
+
+
+
+
+
+
+
+		
+		# 휴리스틱을 이용한 심볼라이즈 (GOT 베이스로 데이터에 접근하는 경우 휴리스틱 이용)
+		if options.testingcrashhandler is True: # Crash based 디자인에서는 필요없음
+			'nothing to do'
+		else:
+			# got 기반
+			logging("now emulation_got")
+			emulation_got(pcthunk_reglist, resdic,CHECKSEC_INFO) 
+			# symbolization 이 안된 것들은 쓰레기통으로 보낸다.
+			logging("now lfunc_change_callweirdaddress_2_callXXX")
+			for SectionName in CodeSections_WRITE:
+				if SectionName in resdic.keys():
+					lfunc_change_callweirdaddress_2_callXXX(resdic[SectionName])
+			logging("now lfunc_change_callweirdaddress_2_data")
+			for SectionName in CodeSections_WRITE:
+				if SectionName in resdic.keys():
+					lfunc_change_callweirdaddress_2_data(resdic[SectionName])
+		
+
+		
+
+		# 링킹된 함수에서 비어있는 레지스터자리 채워주기. ex) call stderror@GOT(REGISTER_WHO)로 blank로 심볼리제이션된거 resdic[3]을 참조해서 레지스터자리 채워준다.
+		logging("now fill_blanked_symbolname_toward_GOTSECTION")
+		fill_blanked_symbolname_toward_GOTSECTION(resdic)
+			   
+
+
+		# 재조립 바이너리에서의 GOT를 얻어오는(필요할지도 모르므로) 루틴을 생성자배열에 추가.
+		logging("now add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array")
+		addRoutineToGetGLOBALOFFSETTABLE_in_init_array(resdic)
+
 	else:
-		# got 기반
-		logging("now emulation_got")
-		emulation_got(pcthunk_reglist, resdic,CHECKSEC_INFO) 
-		# symbolization 이 안된 것들은 쓰레기통으로 보낸다.
-		logging("now lfunc_change_callweirdaddress_2_callXXX")
-		for SectionName in CodeSections_WRITE:
-			if SectionName in resdic.keys():
-				lfunc_change_callweirdaddress_2_callXXX(resdic[SectionName])
-		logging("now lfunc_change_callweirdaddress_2_data")
-		for SectionName in CodeSections_WRITE:
-			if SectionName in resdic.keys():
-				lfunc_change_callweirdaddress_2_data(resdic[SectionName])
-	
+		logging("now symbolize_textsection")
+		get_r_386_relative(options.filename, resdic)
+		#symbolize_got(resdic)
+		symbolize_textsection_pic(resdic) 
+		symbolize_got_based_addressing(resdic)
 
-	
-
-	# 링킹된 함수에서 비어있는 레지스터자리 채워주기. ex) call stderror@GOT(REGISTER_WHO)로 blank로 심볼리제이션된거 resdic[3]을 참조해서 레지스터자리 채워준다.
-	logging("now fill_blanked_symbolname_toward_GOTSECTION")
-	fill_blanked_symbolname_toward_GOTSECTION(resdic)
-                   
-
-
-	# 재조립 바이너리에서의 GOT를 얻어오는(필요할지도 모르므로) 루틴을 생성자배열에 추가.
-	logging("now add_routine_to_get_GLOBAL_OFFSET_TABLE_at_init_array")
-	addRoutineToGetGLOBALOFFSETTABLE_in_init_array(resdic)
-
+		'''
+		remove_sec = ['.got','.got.plt','.jcr','.plt.got', '.plt']
+		for sec in remove_sec:
+			if sec in resdic.keys():
+				del resdic[sec]
+		'''
+		#symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
 
 	if options.align is True: 
 		if '.text' in resdic.keys():
