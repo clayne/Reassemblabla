@@ -11,6 +11,8 @@ AllSections_WRITE  = CodeSections_WRITE + DataSections_WRITE
 # 아래 섹션들은 text/data 섹션으로써 디스어셈블리에 쓰인다
 TreatThisSection2TEXT = ['.init','.fini', '.ctors', '.dtors', '.plt.got', '.plt']
 TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got', '.got.plt']
+#HSKIM
+TreatThisSection2DATA = ['.jcr', '.data1', '.rodata1', '.tbss', '.tdata', '.got.plt']
 
 # 네임드 심볼을 지정
 MyNamedSymbol = ['main', '__x86.get_pc_thunk']

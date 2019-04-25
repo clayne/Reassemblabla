@@ -73,10 +73,14 @@ if __name__=="__main__":
 	CHECKSEC_INFO = pwnlib.elf.elf.ELF(options.filename, False)
 
 
-
 	# 심볼화에 사용할 다이나믹심볼들을 구해온다. (.dynsym 은 처리안해줘도 된다. 왜냐하면 .rel.dyn과 .rel.plt에 포함되어있기 때문)
 	logging("get_relocation_tables")
-	T_rel = get_relocation_tables(options.filename)
+
+	#HSKIM
+	if not options.pic:
+		T_rel = get_relocation_tables(options.filename)
+	else:
+		T_rel = get_relocation_tables_pic(options.filename, resdic)
 
 
 	# PIE라면 외부라이브러리 resolve를 해주기 위해 휴리스틱 필요. (.plt.got 부분이 jmpl *0xc(%ebx)이렇게 생겨서 원샷에 resolve 못한다)
@@ -124,7 +128,7 @@ if __name__=="__main__":
 	pcthunk_reglist = getpcthunk_labeling(resdic)
 
 
-
+	#HSKIM
 	if not options.pic:
 		# 일반 심볼 심볼라이즈
 		logging("now symbolize_textsection")
@@ -189,12 +193,11 @@ if __name__=="__main__":
 	else:
 		logging("now symbolize_textsection")
 		get_r_386_relative(options.filename, resdic)
-		#symbolize_got(resdic)
 		symbolize_textsection_pic(resdic) 
 		symbolize_got_based_addressing(resdic)
 
-		'''
-		remove_sec = ['.got','.got.plt','.jcr','.plt.got', '.plt']
+		'''	
+		remove_sec = ['.got.plt', '.plt']
 		for sec in remove_sec:
 			if sec in resdic.keys():
 				del resdic[sec]

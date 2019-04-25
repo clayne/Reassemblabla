@@ -404,6 +404,73 @@ def get_relocation_tables(filename):
 					RET['STT_NOTYPE'].update({ADDR:symname})
 	return RET
 
+
+def get_relocation_tables_pic(filename, resdic, option = 'non-plt'):
+	DYNSYM_LIST = get_DYNSYM_LIST(filename)
+	RELOSYM_LIST = {'R_386_32':{}, 'R_386_COPY':{}, 'R_386_GLOB_DAT':{}, 'R_386_JUMP_SLOT':{}} # TODO: R_386_32 는 어떻게 처리해줘야 함? 예를들어 /bin/dash 에는 이 타입의 심볼이있어서 추가는해줬는데, 이거에대한 핸들링루틴이 없음.  
+	RET = {'STT_FUNC':{}, 'STT_OBJECT':{}, 'STT_NOTYPE':{}}
+
+	TYPES = {1:'R_386_32', 5:'R_386_COPY', 6:'R_386_GLOB_DAT', 7:'R_386_JUMP_SLOT'}
+
+	bin = ELFFile(open(filename,'rb'))
+	for section in bin.iter_sections():
+		if not isinstance(section, RelocationSection):
+			continue
+		else:
+			symtable = bin.get_section(section['sh_link']) # symtable = '.dynsym' 섹션임. sh_link 정보를가지고 어떤 섹션에 접근을 하는구나. 
+			for rel in section.iter_relocations():
+				_type = rel['r_info_type'] 
+				symbol = symtable.get_symbol(rel['r_info_sym'])
+				if symbol.name != '':
+					#HSKIM error
+					if _type in TYPES.keys():
+						#RELOSYM_LIST[TYPES[_type]][rel['r_offset']] = symbol.name
+						symname = symbol.name
+						ADDR = rel['r_offset']
+
+						suffix = ''
+						if section.name == '.rel.plt':
+							if option == 'non-plt':
+								suffix = '__MYSYM2'
+								resdic['.got.plt'][ADDR][1][0] = ' .long ' + symname
+								resdic['.got.plt'].pop(ADDR+1)
+								resdic['.got.plt'].pop(ADDR+2)
+								resdic['.got.plt'].pop(ADDR+3)
+							else:
+								suffix = '@PLT'
+
+
+						if symname in DYNSYM_LIST.keys(): 
+							if DYNSYM_LIST[symname] is 'STT_FUNC':
+								RET['STT_FUNC'].update({ADDR:symname+suffix})
+							elif DYNSYM_LIST[symname] is 'STT_OBJECT':
+								RET['STT_OBJECT'].update({ADDR:symname+suffix})
+							elif DYNSYM_LIST[symname] is 'STT_NOTYPE': # ex) _Jv_RegisterClasses 같은것들. 이 타입의 객체는 심볼라이즈해주면 컴파일에러남. (컴파일러가 자동으로 추가해주므로, 사전에 있을시에 문제되는것들)
+								RET['STT_NOTYPE'].update({ADDR:symname+suffix})
+	'''
+	현재까지 RELOSYM_LIST 상태는 다음과 같다. 
+	R_386_COPY : {}
+	R_386_GLOB_DAT : {134518400 : __gmon_start__}
+	R_386_32 : {}
+	R_386_JUMP_SLOT : {134518416 : printf, 134518420 : __libc_start_main}
+	'''
+	for R_TYPE in RELOSYM_LIST.keys():
+		for ADDR in RELOSYM_LIST[R_TYPE].keys():
+			symname = RELOSYM_LIST[R_TYPE][ADDR]
+
+			if symname in DYNSYM_LIST.keys(): 
+				if DYNSYM_LIST[symname] is 'STT_FUNC':
+					RET['STT_FUNC'].update({ADDR:symname})
+				elif DYNSYM_LIST[symname] is 'STT_OBJECT':
+					RET['STT_OBJECT'].update({ADDR:symname})
+				elif DYNSYM_LIST[symname] is 'STT_NOTYPE': # ex) _Jv_RegisterClasses 같은것들. 이 타입의 객체는 심볼라이즈해주면 컴파일에러남. (컴파일러가 자동으로 추가해주므로, 사전에 있을시에 문제되는것들)
+					RET['STT_NOTYPE'].update({ADDR:symname})
+	return RET
+
+
+
+
+
 def transform_byte2dword(resdic, section_from, addr):
 	candidate = ''
 	resdic[section_from][addr][1][0]		
@@ -468,7 +535,7 @@ def get_r_386_relative(filename, resdic):
 					resdic[section].pop(rOffset+2)
 					resdic[section].pop(rOffset+1)
 					resdic[section][rOffset][1][0] = " .long " + symName 
-					resdic[section][rOffset][0] = 'MYSYM_GOT_' + symName + ':'
+					resdic[section][rOffset][0] = 'MYSYM_GOT_' + section[1:] + symName + ':'
 
 					got_dict[rOffset] = resdic[section][rOffset][0][:-1]
 

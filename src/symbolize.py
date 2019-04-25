@@ -250,7 +250,7 @@ def symbolize_textsection_pic(resdic):
 									resdic[section_to][DEST][0] = simbolname + ":"
 								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST),simbolname)     # 만약에 0x8048540 이렇게생겼을경우 0x8048540 --> MYSYM_1 치환
 								resdic[section_from][ADDR][1][orig_i] = resdic[section_from][ADDR][1][orig_i].replace(hex(DEST)[2:],simbolname) # 그게아니라 12 이렇게생겼을경우 12 --> MYSYM_1 치환 (그럴리는없겠지만..)
-								print('symbolize!!')
+								#print('symbolize!!')
 	symbolize_counter('Symbolize (textsection) : {}'.format(symbolize_count))
 	return resdic
 
@@ -276,30 +276,57 @@ def symbolize_got_based_addressing(resdic):
 				#pdb.set_trace()
 				addr, def_set= lineObj.pop_node()
 			
+def expand_data(lineObj, data_end, bss_start, addr):
+	DISA = lineObj.resdic['.data'][data_end][1][0]
+	directive = DISA.split()[0]
+	if directive == '.long':
+		off = 4
+	elif directive == '.byte':
+		off = 1
+
+	for addr in range(data_end+off, bss_start):
+		lineObj.resdic['.data'][addr] = ['',[' .byte 0x00'], '', '']
+		lineObj.global_map[addr] = '.data'
+	
+
 def get_symbolized_label(lineObj, argv, got_addr):
 
 	disp_str = argv.split('(')[0]
 	
 	try:
 		disp = int(disp_str, 16)
-			
+				
 		if disp == 0:
 			return argv
 		
 	except:
 		return argv
 		
-	print('label %x = %x + (%x)'%(disp+got_addr, got_addr, disp))
+	print('%20s label %x = %x + (%x)'%('\t',disp+got_addr, got_addr, disp))
 	symbol_name = lineObj.get_symbol_name(disp+got_addr)
 
 	if symbol_name is None:
+
+		import pdb
+		print('unknown???')		
+		
+		cur_idx, cur = lineObj.get_cur_line()
+		cur[2] += '<-- this is unknown address'
+
 		data_end = max(lineObj.resdic['.data'].keys())
 		bss_start = min(lineObj.resdic['.bss'].keys())
 		if disp+got_addr > data_end and disp+got_addr <= bss_start:
-			return	argv
-		import pdb
+			return argv
+			#expand_data(lineObj, data_end, bss_start, disp+got_addr)
+			#return	get_symbolized_label(lineObj, argv, got_addr)
 		pdb.set_trace()
-		print('unknown???')		
+
+		got_end = max(lineObj.resdic['.got'].keys())
+		got_plt_start = min(lineObj.resdic['.got.plt'].keys())
+		if disp+got_addr > got_end and disp+got_addr <= got_plt_start:
+			return	argv
+
+
 		abort()
 
 	if '@GOT' in symbol_name or '@plt' in symbol_name:
@@ -345,8 +372,8 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 		DISA = cur[1][0]
 		instObj = InstParser(DISA)
 
-		print(DISA)
-		print(def_set)
+		print '%-30s'%(DISA),
+		print('\t\t\t\t\t'+str(def_set))
 		if DISA == ' movl.d32 -0x260(%esi, %eax, 4), %ecx':
 			import pdb
 			#pdb.set_trace()	
@@ -360,7 +387,17 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 					def_set.add(instObj.argv[-1])
 					break	
 				elif item in instObj.argv[-2] and len(instObj.get_register_names(item)) > 0:
-					handle_argv2(lineObj, instObj, got_addr)
+					#  leal.d8 0(%esi), %esi                             set(['%esi'])
+					if 'leal' == instObj.op:
+						res = re.findall('(.*)\((....)\)', instObj.argv[-2])
+						if len(res) > 0:
+							disp, reg1 = res[0]
+							if 'MYSYM' not in disp and int(disp, 16) == 0 and reg1 == item:
+								def_set.add(instObj.argv[-1])
+								break	
+					if item == instObj.argv[-2] or '(' not in item:
+						
+						handle_argv2(lineObj, instObj, got_addr)
 				
 				if item == instObj.argv[-1]:
 					if instObj.op == 'movl' and instObj.argv[-2] in def_set:
@@ -405,6 +442,7 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 						print(DISA)
 						abort()
 					jump_list = jump_symbolize(lineObj, reg)
+					
 					for item in jump_list:
 						lineObj.add_node(item, def_set)
 					break
@@ -428,18 +466,30 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 		elif len(instObj.argv) == 2:
 			# in case of floating pointer instruction
 			# TODO: floating pointer handling
+			import pdb
 			for item in def_set:
-                                if item in instObj.argv[-1]:
-					handle_argv1(lineObj, instObj, got_addr)
+				if item  == instObj.argv[-1]:
+					print('remove~~~~~~~~~~~~push!!')
+					#pdb.set_trace()
+					def_set.remove(item)
 					break
-				'''
+                                elif item in instObj.argv[-1]:
+
+					if item == instObj.argv[-1] or '(' not in item:
+						handle_argv1(lineObj, instObj, got_addr)
+						break
 				else:
 					reg_names = instObj.get_register_names(item)
+					remove_set = set()
 					for reg_name in reg_names[1:]:
 						if reg_name == instObj.argv[-1]:
-							def_set.remove(item)
+							print('remove~~~~~~~~~~~~reg!!')
+							#pdb.set_trace()
+							remove_set.add(item)
 							break
-				'''
+					if len(remove_set) > 0:
+						def_set -= remove_set
+						break
 
 		cur_idx, cur = lineObj.get_next_line()
 
@@ -529,11 +579,11 @@ def jump_symbolize(lineObj, reg):
 
 	curIdx = lineObj.get_cur_line()[0]
 
-	minIdx = curIdx - 10
+	minIdx = curIdx - 20
 
 	label = ''
 	mul = 0
-	prevIdx,prev = lineObj.get_prev_line()
+	prevIdx,prev = lineObj.get_prev_line(option='cfg')
 	while prevIdx > minIdx:
 		print('jump1: ' + prev[1][0])
 		prevInst = InstParser(prev[1][0])
@@ -544,10 +594,10 @@ def jump_symbolize(lineObj, reg):
 		elif 'movl' == prevInst.op and reg == prevInst.argv[-1]:
 			reg = prevInst.argv[-2]
 
-		prevIdx,prev = lineObj.get_prev_line()
+		prevIdx,prev = lineObj.get_prev_line(option='cfg')
 
 	if len(label) == 0:
-		prevIdx,prev = lineObj.get_prev_line()
+		prevIdx,prev = lineObj.get_prev_line(option='cfg')
 		while prevIdx > minIdx:
 			print('jump2: ' + prev[1][0])
 			prevInst = InstParser(prev[1][0])
@@ -555,14 +605,14 @@ def jump_symbolize(lineObj, reg):
 			if 'movl' == prevInst.op and reg == prevInst.argv[-1]:
 				label, reg, mul = jump_step1(prevInst, reg, prev_def_set)
 				break			
-			prevIdx,prev = lineObj.get_prev_line()
+			prevIdx,prev = lineObj.get_prev_line(option='cfg')
 
 	if len(label) == 0:
 		abort()
 
 	myMax = 0
 	if mul == 0:	
-		prevIdx,prev = lineObj.get_prev_line()
+		prevIdx,prev = lineObj.get_prev_line(option='cfg')
 		while prevIdx > minIdx:
 			print('jump3: ' + prev[1][0])
 			prevInst = InstParser(prev[1][0])
@@ -570,52 +620,71 @@ def jump_symbolize(lineObj, reg):
 				if '$2' != prevInst.argv[-2]:
 					abort()
 				break
+			
 			#TODO exception:
-			if 'cmpl' == prevInst.op:
+			if prevInst.op in ['cmpw', 'cmpl']:
 				if '$' in prevInst.argv[-1]: 
 					myMax = int(prevInst.argv[-1][1:], 16)
 					break
 				elif '$' in prevInst.argv[-2]:
 					myMax = int(prevInst.argv[-2][1:], 16)
 					break
-
-			prevIdx,prev = lineObj.get_prev_line()
+			
+			prevIdx,prev = lineObj.get_prev_line(option='cfg')
 
 	if myMax == 0:
 		target = reg
 
-		prevIdx,prev = lineObj.get_prev_line()
+		prevIdx,prev = lineObj.get_prev_line(option='cfg')
 		while prevIdx > minIdx:
 			print('jump4: ' + prev[1][0])
 			prevInst = InstParser(prev[1][0])
 			if prevInst.argv[-1] == target:
 				if prevInst.op == 'movl':
 					target = prevInst.argv[-2]
-				elif prevInst.op == 'movzbl':
+				elif prevInst.op in ['movzbl', 'movzwl']:
 					'''
 					reg_names = prevInst.get_register_names(target)
 					print(reg_names)
 					if target not in reg_names:
 						abort()	
 					'''
-					target = prevInst.argv[-2]
-				elif prevInst.op == 'cmpl':
-					if prevInst.argv[-1] == target:
+					reg_names = prevInst.get_register_names(prevInst.argv[-2])
+					if len(reg_names) > 0:
+						target = reg_names[0]	
+					else:
+						target = prevInst.argv[-2]
+			if prevInst.op == 'cmpl':
+				if prevInst.argv[-1] == target:
+					myMax = int(prevInst.argv[-2][1:], 16)
+					break
+				elif prevInst.argv[-2] == target:
+					myMax = int(prevInst.argv[-1][1:], 16)
+					break
+			elif prevInst.op in ['cmpb', 'cmpw']:
+				reg_names = prevInst.get_register_names(target)
+				print(reg_names)
+				if len(reg_names) == 0:
+					if prevInst.argv[-1] == target: 
 						myMax = int(prevInst.argv[-2][1:], 16)
-						break
 					elif prevInst.argv[-2] == target:
 						myMax = int(prevInst.argv[-1][1:], 16)
-						break
-				elif prevInst.op == 'cmpb':
-					if prevInst.argv[-1] == target:
-						myMax = int(prevInst.argv[-2][1:], 16)
-						break
-					elif prevInst.argv[-2] == target:
-						myMax = int(prevInst.argv[-1][1:], 16)
-						break
+				else:
+					for reg in reg_names:
+						if prevInst.argv[-1] == reg:
+							myMax = int(prevInst.argv[-2][1:], 16)
+							break
+						elif prevInst.argv[-2] == reg:
+							myMax = int(prevInst.argv[-1][1:], 16)
+							break
+				if myMax != 0:
+					break
 
 
-			prevIdx,prev = lineObj.get_prev_line()
+			prevIdx,prev = lineObj.get_prev_line(option='cfg')
+
+	if myMax == 0:
+		abort()
 
 	got_base = min(lineObj.resdic['.got.plt'].keys())	
 	section = '.rodata'
@@ -640,6 +709,7 @@ def jump_symbolize(lineObj, reg):
 		target_addr = got_base + offset
 
 		jump_label = lineObj.resdic['.text'][target_addr][0]
+
 		if len(jump_label) == 0:
 			jump_label = 'MYSYM_JMP_' + str(lineObj.get_unique_count())
 			lineObj.resdic['.text'][target_addr][0] = jump_label + ':'
@@ -656,6 +726,7 @@ def jump_symbolize(lineObj, reg):
 		lineObj.resdic['.rodata'].pop(jump_addr+3)
 		print(lineObj.resdic['.rodata'][jump_addr][1][0])
 	
+	lineObj.set_position(curIdx)
 	return jump_list
 
 class InstParser:
@@ -774,6 +845,8 @@ class LineObject:
 	
 		self.global_def_dic = dict()
 
+		self.call_site = dict()
+
 	def set_idx_def_dic(self, idx, def_dic):
 		self.global_def_dic[idx] = def_dic.copy()
 	def get_idx_def_dic(self, idx):
@@ -799,7 +872,7 @@ class LineObject:
 			return symbol_name[:-1]
 
 			
-		symbol_name = "MYSYM_GOT_" + self.section[1:] + str(self.SYMBOL_INDEX)
+		symbol_name = "MYSYM_GOT_" + section[1:] + str(self.SYMBOL_INDEX)
 		self.SYMBOL_INDEX += 1
 
 		self.resdic[section][addr][0] = symbol_name + ':'
@@ -846,6 +919,8 @@ class LineObject:
 
 
 
+	def set_position(self, position):
+		self.position = position
 	def set_line(self, addr):
 		self.position = self.navi_dict[addr]
 
@@ -867,8 +942,22 @@ class LineObject:
 		return self.line_list[self.position]
 
 
-	def get_prev_line(self):
-		self.position -= 1
+	def get_prev_line(self, option = ''):
+		if option == 'cfg':
+			cur_addr = self.line_list[self.position]
+			label = self.resdic[self.section][cur_addr][0]
+			if len(label):
+				position = self.get_call_site(label[:-1])
+				if position is None:
+					import pdb
+					pdb.set_trace()
+					abort()
+				self.position = position 
+			else:
+				self.position -= 1
+		else:	
+			self.position -= 1
+
 		if self.position < 0 or self.position >= self.size:
 			self.position = -1
 			return (self.position, None)
@@ -895,11 +984,25 @@ class LineObject:
 		if addr in self.node_list:
 			return None
 
-		print('add_node: %s %x'%(label,addr))
-		print(def_set)
+		print '\t\t\t\t\tadd_node: %10s %x'%(label,addr), 
+		print str(def_set)
+
+		self.record_call_site(label)
 
 		self.node_list.append((addr,def_set.copy()))
 		return addr
+
+	def record_call_site(self, label):
+		if label not in self.call_site.keys():
+			if label+':' == self.get_cur_line()[1][0] :
+				self.call_site[label] = self.position - 1
+			else:
+				self.call_site[label] = self.position
+
+	def get_call_site(self, label):
+		if label not in self.call_site.keys():
+			return None
+		return self.call_site[label]
 
 	def pop_node(self):
 		if len(self.node_list) > 0:
@@ -908,8 +1011,8 @@ class LineObject:
 				if len(self.node_list) == 0:
 					return None, None
 				addr,def_set = self.node_list.pop(0)
-			print('pop node : %x'%(addr))
-			print(def_set)	
+			print '\t\t\t\t\tpop node : %x'%(addr), 
+			print str(def_set)
 			self.mark_visit_site(addr)
 			return addr, def_set
 
