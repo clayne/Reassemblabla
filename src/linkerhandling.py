@@ -24,6 +24,11 @@ def got2name_to_plt2name(T_got2name, CHECKSEC_INFO, resdic):
 		gotaddr = gotaddr[0]
 		if gotaddr in T_got2name.keys():
 			T_plt2name[pltaddr] = T_got2name[gotaddr]
+			del T_got2name[gotaddr] # added on 20198-04-17, 이미 got뭐시기관련되서 처리해준거는 삭제하고 
+
+	for rewrittenaddr in T_got2name.keys():
+		T_plt2name[rewrittenaddr] = T_got2name[rewrittenaddr] # 0x041 call 0x042 ---> 이거는 나중에 call printf로 덮어씌워짐 로딩타임에. 이런심볼들도 T_got2name 에 있으니까 넣어주자 
+
 	return T_plt2name 
 
 # full relro 인 경우에는 좀더 복잡하게 링킹을 풀어줌

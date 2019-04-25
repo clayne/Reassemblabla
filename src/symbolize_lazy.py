@@ -30,6 +30,7 @@ def setup_some_useful_stuffs_for_crashhandler(resdic): # 레지스터 백업함�
 .lcomm MYSYM_LIBFLAG, 4
 .lcomm MYSYM_DUMMY, 4
 .lcomm MYSYM_CRASHCOUNTER, 4
+.lcomm MYSYM_FAILTOFIXCOUNT, 4
 
 .lcomm MYSYM_EFLAGS, 4
 .lcomm MYSYM_EAX, 4
@@ -68,14 +69,23 @@ MYSYM_restoreregistercontext:
 
 	asm_exit = '''
 #+++++
-# crash handler 를 거쳐서도 해결안되는 심볼.. 즉, 애초부터 세그폴의 운명이였던 놈은 이곳으로 탈출해라.....
+# crash handler 를 거쳐서도 해결안되는 심볼..
 MYSYM_MYEXIT: 
 	# movl $0x1, %eax
 	# movl $0x3, %ebx
 	# int $0x80
+	cmp $0x10, MYSYM_FAILTOFIXCOUNT
+	je MYSYM_LIBRARYCALLSPOT
+	addl $0x1, MYSYM_FAILTOFIXCOUNT
+	mov MYSYM_EIP, %eax
+	mov %eax, 0xdc(%esp)
+	ret
+
+MYSYM_LIBRARYCALLSPOT:
 	mov MYSYM_MYEXITADDR, %eax
 	mov %eax, 0xdc(%esp)              
 	ret 	
+
 MYSYM_EXIT:
 	movl $0x1, %eax
 	movl $0x3, %ebx
@@ -147,6 +157,7 @@ def addRoutineToInstallSignalHandler_in_init_array(resdic):
 											'']
 
 
+
 def return_crashhandler_block(addr, nextpiecename, count, symbolname):
 	isitgotbased = 'no'
 	if 'REGISTER_WHO' in symbolname:
@@ -172,7 +183,8 @@ def return_crashhandler_block(addr, nextpiecename, count, symbolname):
 
 	asm_block  += 		'MYSYM_CRASHHANDLER_LIB_%s: '					+ ' ' + '#+++++' + '\n'
 	asm_block  += 		' dec %%ecx'									+ ' ' + '#+++++' + '\n' # 카운터 감소(0 == 스택에 크래시유발값이 없는경우)
-	asm_block  += 		' jz MYSYM_CRASHHANDLER_LIB_REG_%s'				+ ' ' + '#+++++' + '\n'
+	#asm_block  += 		' jz MYSYM_CRASHHANDLER_LIB_REG_%s'				+ ' ' + '#+++++' + '\n' # COMMENT: 레지스터 픽싱루틴으로뛰는거 비활성화함. 문제가 많더라고.
+	asm_block  += 		' jz MYSYM_EXIT #%s'							+ ' ' + '#+++++' + '\n'
 	asm_block  += 		' add $0x4, %%ebx'								+ ' ' + '#+++++' + '\n'
 	asm_block  += 		' cmp %%eax, (%%ebx)' 							+ ' ' + '#+++++' + '\n'
 	asm_block  += 		' jne MYSYM_CRASHHANDLER_LIB_%s' 				+ ' ' + '#+++++' + '\n'
@@ -288,8 +300,6 @@ def setupsignalhandler(resdic):
 	
 
 
-
-
 def symbolize_crashhandler_allmemref(resdic): # TODO: lea __procname@GOT(REGISTER_WHO), %eax 이거 앞에 MYSYM_HEREIS_GLOBAL_OFFSET_TABLE_ 사용하도록 고칠 것. 
 	_ = '.*?'
 	count = 0
@@ -396,20 +406,20 @@ def symbolize_crashhandler_allmemref(resdic): # TODO: lea __procname@GOT(REGISTE
 			
 			
 			# 마지막으로 바뀐 디스어셈블리를 붙여준다. 
-			if itisbranch is False: # 브랜치가 아닌 일반적인 멤참조  ex) mov $0x12, 0x12(%eax,%ebx,2)
+			if itisbranch is False: # 브랜치가 아닌 일반적인 메모리참조  ex) mov $0x12, 0x12(%eax,%ebx,2)
 				_ = DISASM.replace(MEMREF, '')
-				if '%eax' in _ or '%ax' in _ or '%al' in _ or '%ah' in _: # %ebx : 예외적인 경우, mov %eax, 0x4(%edi) 같이 source가 %eax인 경우... 이때는 %ebx 사용.
-					NEWDISASM.append(' # _ : {}.....Lets use EBX!!!'.format(_))
-					NEWDISASM.append(' mov %ebx, MYSYM_EBX'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음. 위에서 이미 MYSYM_restoreregistercontext 를 호출하자나?
-					NEWDISASM.append(' mov MYSYM_CRASHADDR, %ebx'														+ ' ' + '#+++++')				
-					NEWDISASM.append(DISASM.replace(MEMREF, '(%ebx)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
-					NEWDISASM.append(' mov MYSYM_EBX, %ebx'																+ ' ' + '#+++++') 
-				else: # 디폴트로는  %eax  사용~~~
-					NEWDISASM.append(' # _ : {}.....Lets use EAX!!!'.format(_))
-					NEWDISASM.append(' mov %eax, MYSYM_EAX'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음.
-					NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax'														+ ' ' + '#+++++')				
-					NEWDISASM.append(DISASM.replace(MEMREF, '(%eax)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
-					NEWDISASM.append(' mov MYSYM_EAX, %eax'																+ ' ' + '#+++++') 	
+				if '%edi' in _ or '%di' in _ or '%dl' in _ or '%dh' in _: # %esi : 예외적인 경우, mov %edi, 0x4(%edi) 같이 source가 %edi 경우... 이때는 %esi 사용.
+					NEWDISASM.append(' # _ : {}.....Lets use ESI!!!'.format(_))
+					NEWDISASM.append(' mov %esi, MYSYM_ESI'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음. 위에서 이미 MYSYM_restoreregistercontext 를 호출하자나?
+					NEWDISASM.append(' mov MYSYM_CRASHADDR, %esi'														+ ' ' + '#+++++')				
+					NEWDISASM.append(DISASM.replace(MEMREF, '(%esi)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
+					NEWDISASM.append(' mov MYSYM_ESI, %esi'																+ ' ' + '#+++++') 
+				else: # 디폴트로는  %edi (e default i)  사용~~~
+					NEWDISASM.append(' # _ : {}.....Lets use EDI!!!'.format(_))
+					NEWDISASM.append(' mov %edi, MYSYM_EDI'																+ ' ' + '#+++++') # TODO: 이거 필요 없을것같음.
+					NEWDISASM.append(' mov MYSYM_CRASHADDR, %edi'														+ ' ' + '#+++++')				
+					NEWDISASM.append(DISASM.replace(MEMREF, '(%edi)')													+ ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF)) 
+					NEWDISASM.append(' mov MYSYM_EDI, %edi'																+ ' ' + '#+++++') 	
 			elif itisbranch is True: # 브랜치
 				DISASM = DISASM.replace('*','')
 				NEWDISASM.append(DISASM.replace(MEMREF, '*MYSYM_CRASHADDR') + ' # Prefix added. original({}) : {}, MEMREF : {} #+++++'.format(hex(addr), resdic['.text'][addr][1][j], MEMREF))
@@ -622,7 +632,6 @@ def symbolize_crashhandler_segmentregister_2(resdic):
 	symbolize_counter('Crash(segment register 2) : {}'.format(count))
 
 
-
 def symbolize_crashhandler_externalfunctioncall(resdic):
 	_ = '.*?'
 	count = 0
@@ -692,7 +701,6 @@ def symbolize_crashhandler_externalfunctioncall(resdic):
 	symbolize_counter('Crash(external functioncall) : {}'.format(count))
 
 
-
 # get_pc_thunk 가 원본바이너리주소를 리턴하도록 바꾼다.
 def getpcthunk_to_returnoriginalADDR(resdic): 
 	textsections =  ['.text'] + TreatThisSection2TEXT 
@@ -737,25 +745,28 @@ def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리
 	NEWDISASM.append(' # heuristic_stack_fixing' 											+ ' ' + '#+++++')
 	NEWDISASM.append(' call MYSYM_backupregistercontext' 									+ ' ' + '#+++++') 
 	NEWDISASM.append(' mov %esp, MYSYM_ESP'													+ ' ' + '#+++++') 
-	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'												+ ' ' + '#+++++')
+	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'											+ ' ' + '#+++++')
+	NEWDISASM.append(' movl $0x0, MYSYM_FAILTOFIXCOUNT'										+ ' ' + '#+++++')
 
 	# [02] 플래그같은거 설정해줌 
 	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_MYEXITADDR' 							+ ' ' + '#+++++') 
 	for paramnum in nst_param_list:
-		if paramnum > 1000: # 입력 파라미터가 몇개인지 모른다. n번째부터 n+???개의 파라미터를 심볼화해줘야 한다는 뜻.
+		if paramnum >= 1000: # 입력 파라미터가 몇개인지 모른다. n번째부터 n+???개의 파라미터를 심볼화해줘야 한다는 뜻.
 			paramnum = paramnum/1000
 			LOC_ESP   = '{}(%esp)'.format(hex(4*(paramnum - 1))) 
 			symbolname1 = 'MYSYM_FORLOOP_' + hex(ADDR) 
 			symbolname2 = 'MYSYM_PARAMINFI_' + hex(ADDR)  
 
-			# n~ 번째 파라미터에 대한 스택픽싱을 설치한당.
+			# n~ 번째 파라미터에 대한 스택픽싱을 설치.
 			NEWDISASM.append('')
 			NEWDISASM.append(' # ' + ' ∞st stack fixing... : ' + LOC_ESP	  			    + ' ' + '#+++++')
 			NEWDISASM.append(' lea ' + LOC_ESP + ', %esi'									+ ' ' + '#+++++') # 현재스택의위치 저장
 			NEWDISASM.append(' mov %esi, MYSYM_STACKLOC'									+ ' ' + '#+++++')
 
 			NEWDISASM.append(symbolname1 + ':'												+ ' ' + '#+++++')
-			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 만약에 크래시핸들러가 EXIT갈때까지갔다면, MYSYM_MYEXIT 에서는 바로 라이브러리콜하는곳으로 간당.
+			NEWDISASM.append(' movl $' + symbolname2 +', MYSYM_EIP' 						+ ' ' + '#+++++') # 크래시핸들러가 리턴할 주소는 여기다. 
+																											  # 만약에 이값이 고쳐써먹어줄수 없는 값 (4같은 상수값)이라면, 크래시핸들러의 MYSYM_MYEXIT 까지 찍게된다.
+																											  # MYSYM_MYEXIT 에서는 MYSYM_FAILTOFIXCOUNT 카운트를 1씩 늘리고, 이 카운트가 10이 되면 라이브러리 콜부로 간다.
 			
 			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') # esi (%esp 대체품) 에서부터 쫄쫄 올라가면서 스택픽싱한당.
 			NEWDISASM.append(' mov (%esi), %eax' 											+ ' ' + '#+++++')
@@ -764,17 +775,16 @@ def heuristic_stack_fixing(resdic_text, ADDR, nst_param_list): # COMMENT: 휴리
 			NEWDISASM.append( symbolname2 + ':'									 			+ ' ' + '#+++++') # 컴백은 여기로.
 			NEWDISASM.append(' mov MYSYM_CRASHADDR, %eax' 									+ ' ' + '#+++++') # 값읽기 : 스택 -> %eax 
 			NEWDISASM.append(' mov (%eax), %ebx'											+ ' ' + '#+++++') # 크래시유발 (%eax 의 유효성검증)
-			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++')
-			NEWDISASM.append(' mov %eax, (%esi)' 											+ ' ' + '#+++++')
-			NEWDISASM.append(' add $0x4, MYSYM_STACKLOC'									+ ' ' + '#+++++')
-
+			NEWDISASM.append(' mov MYSYM_STACKLOC, %esi'									+ ' ' + '#+++++') 
+			NEWDISASM.append(' mov %eax, (%esi)' 											+ ' ' + '#+++++') 
+			NEWDISASM.append(' add $0x4, MYSYM_STACKLOC'									+ ' ' + '#+++++') 
 			NEWDISASM.append(' jmp ' + symbolname1 											+ ' ' + '#+++++')
 
 		else:
 			LOC_ESP  = '{}(%esp)'.format(hex(4*(paramnum - 1))) # 첫번째 파라미터라면 esp+0, 두번째 파라미터라면 esp+4, ...
 			symbolname1 = 'MYSYM_PARAM' + str(paramnum) + '_' +  hex(ADDR)
 			
-			# n번째 파라미터에 대한 스택픽싱을 설치한당.
+			# n 번째 파라미터에 대한 스택픽싱을 설치한당.
 			NEWDISASM.append('')
 			NEWDISASM.append(' movl $' + symbolname1 +', MYSYM_EIP' 						+ ' ' + '#+++++')
 
@@ -815,7 +825,7 @@ def heuristic_stack_fixing_multidemension(resdic_text, ADDR, nst_param_list, dem
 	NEWDISASM.append(' call MYSYM_backupregistercontext' 									+ ' ' + '#+++++') 
 	NEWDISASM.append(' mov %esp, MYSYM_ESP'													+ ' ' + '#+++++') 
 	NEWDISASM.append(' movl $0x0, MYSYM_LIBFLAG'											+ ' ' + '#+++++')
-
+	NEWDISASM.append(' movl $0x0, MYSYM_FAILTOFIXCOUNT')
 	# [02] 플래그같은거 설정해줌 
 	NEWDISASM.append(' movl $' + symbolname0 + ', MYSYM_MYEXITADDR' 							+ ' ' + '#+++++') 
 	for paramnum in nst_param_list:
