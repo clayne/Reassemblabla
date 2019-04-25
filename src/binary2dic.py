@@ -385,18 +385,11 @@ def get_relocation_tables(filename):
 			for rel in section.iter_relocations():
 				_type = rel['r_info_type'] 
 				symbol = symtable.get_symbol(rel['r_info_sym'])
-<<<<<<< HEAD
 				if symbol.name != '':
 					#HSKIM error
 					if _type in TYPES.keys():
 						RELOSYM_LIST[TYPES[_type]][rel['r_offset']] = symbol.name
-=======
-				
-				if symbol.name != '': 
-					print 'type : {}, symbol name : {}'.format(_type, symbol.name) 
-					RELOSYM_LIST[TYPES[_type]][rel['r_offset']] = symbol.name
 
->>>>>>> 30367c23a4f64a2f6c221c00daf804a20dcd9d35
 	'''
 	현재까지 RELOSYM_LIST 상태는 다음과 같다. 
 	R_386_COPY : {}
