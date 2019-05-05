@@ -194,6 +194,7 @@ if __name__=="__main__":
 		logging("now symbolize_textsection")
 		get_r_386_relative(options.filename, resdic)
 		symbolize_textsection_pic(resdic) 
+
 		symbolize_got_based_addressing(resdic)
 
 		'''	
@@ -204,15 +205,18 @@ if __name__=="__main__":
 		'''
 		#symbolize_textsection(resdic, options.testingcrashhandler) # 크래시핸들러 기반디자인을 적용하는경우 vsa도 같이 적용해줌. 
 
-	if options.align is True: 
-		if '.text' in resdic.keys():
-			resdic['.text'] = align_text(resdic['.text'])
-		if '.rodata' in resdic.keys():
-			resdic['.rodata'] = align_data(resdic['.rodata'])
-		if '.data' in resdic.keys():
-			resdic['.data'] = align_data(resdic['.data'])
-		if '.bss' in resdic.keys():
-			resdic['.bss'] = align_data(resdic['.bss'])
+	if options.pic:
+		pass
+	else:
+		if options.align is True: 
+			if '.text' in resdic.keys():
+				resdic['.text'] = align_text(resdic['.text'])
+			if '.rodata' in resdic.keys():
+				resdic['.rodata'] = align_data(resdic['.rodata'])
+			if '.data' in resdic.keys():
+				resdic['.data'] = align_data(resdic['.data'])
+			if '.bss' in resdic.keys():
+				resdic['.bss'] = align_data(resdic['.bss'])
 	
 
 	if options.datainsert is True:
@@ -280,7 +284,10 @@ if __name__=="__main__":
 	if options.usesymboltable is True:
 		SYMTAB = get_SYM_LIST(options.filename)
 
-	gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, options.comment, SYMTAB)
+	if options.pic:
+		gen_assemblyfile_pic(LOC, resdic, options.filename, CHECKSEC_INFO, options.comment, SYMTAB)
+	else:
+		gen_assemblyfile(LOC, resdic, options.filename, CHECKSEC_INFO, options.comment, SYMTAB)
 
 
 	# 왜냐하면 x64머신에서는 x86바이너리에대해 compile script까지 만들어줄수가 없기때문임
@@ -294,7 +301,8 @@ if __name__=="__main__":
 	# Select which script to generate!
 	if options.filename.endswith('.so') and mainaddr == -1: # library
 		gen_compilescript_for_sharedlibrary(LOC, options.filename)
-
+	elif options.pic:
+		gen_compilescript_for_piebinary_pic(LOC, options.filename)
 	elif CHECKSEC_INFO.pie == True : # pie binary...
 		gen_compilescript_for_piebinary(LOC, options.filename)
 

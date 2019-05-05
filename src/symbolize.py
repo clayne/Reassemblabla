@@ -256,7 +256,6 @@ def symbolize_textsection_pic(resdic):
 
 def symbolize_got_based_addressing(resdic):
 	import pdb
-	#pdb.set_trace()
 
 
 	got_base = min(resdic['.got.plt'].keys())
@@ -264,18 +263,34 @@ def symbolize_got_based_addressing(resdic):
 	
 		lineObj = LineObject(resdic, section)
 
+		
+		for ret_addr in lineObj.retl_x_list:
+			
+			addr, size = lineObj.handle_retl_x(ret_addr)
+
+			while addr != None:
+				travel_reverse_cfg(lineObj, addr, size)
+				addr,size  = lineObj.pop_jmp_from_site()
+
+		print('-------------------------------------------')
+		print(lineObj.label_retl_size_dict)
+		
+
 		for start in lineObj.get_pc_thunk_call_site_list:
 			print('-------------------------------------------')
 
 			got_addr, addr, def_set = lineObj.handle_get_pc_thunk(start)
+			stack_move = 'unknown'
+			
 			if got_addr != got_base:
 				pdb.set_trace()
 		
 			while addr != None:
-				travel_cfg(lineObj, got_base, addr, def_set)
+				travel_cfg(lineObj, got_base, addr, def_set, stack_move)
 				#pdb.set_trace()
-				addr, def_set= lineObj.pop_node()
+				addr, def_set, stack_move = lineObj.pop_node()
 			
+
 def expand_data(lineObj, data_end, bss_start, addr):
 	DISA = lineObj.resdic['.data'][data_end][1][0]
 	directive = DISA.split()[0]
@@ -292,7 +307,12 @@ def expand_data(lineObj, data_end, bss_start, addr):
 def get_symbolized_label(lineObj, argv, got_addr):
 
 	disp_str = argv.split('(')[0]
-	
+	if '*' == disp_str[0]:
+		prefix = '*'
+		disp_str = disp_str[1:]
+	else:
+		prefix = ''	
+
 	try:
 		disp = int(disp_str, 16)
 				
@@ -319,6 +339,8 @@ def get_symbolized_label(lineObj, argv, got_addr):
 			return argv
 			#expand_data(lineObj, data_end, bss_start, disp+got_addr)
 			#return	get_symbolized_label(lineObj, argv, got_addr)
+
+
 		pdb.set_trace()
 
 		got_end = max(lineObj.resdic['.got'].keys())
@@ -329,11 +351,17 @@ def get_symbolized_label(lineObj, argv, got_addr):
 
 		abort()
 
+	#TODO: if memory refers .got.plt. we gives exception
+	if symbol_name == '.got.plt':
+		return argv
+
+
+	symbol_name = prefix + symbol_name
 	if '@GOT' in symbol_name or '@plt' in symbol_name:
 		return symbol_name.split('@')[0] 
 	else:
 		symbol_name += '@GOTOFF'
-		return symbol_name + argv[len(disp_str):] 
+		return symbol_name + argv[len(prefix+disp_str):] 
 
 
 
@@ -360,7 +388,40 @@ def handle_argv1(lineObj, instObj, got_addr):
 def handle_argv2(lineObj, instObj, got_addr):
 	handle_argv(lineObj, instObj, got_addr,-2)
 
-def travel_cfg(lineObj, got_addr, start_addr, def_set):
+def travel_reverse_cfg(lineObj, end_addr, size):
+	lineObj.set_line(end_addr)
+	cur_idx, cur = lineObj.get_cur_line()
+
+	while True:
+		DISA = cur[1][0]
+		instObj = InstParser(DISA)
+		
+
+		if instObj.op == 'calll':
+			if instObj.argv[1] in ['abort', 'exit', '__assert_fail' , '_exit']:
+				break
+		if 'retl' == instObj.op:
+			break
+		if 'jmpl' == instObj.op:
+			break
+		if 'hlt' == instObj.op:
+			break	
+	
+		label = cur[0]
+
+		if 'MYSYM' in label:
+			lineObj.push_jmp_site(label[:-1], size)
+
+
+		cur_idx, cur = lineObj.get_prev_line()
+
+		if cur is None:
+			break
+
+		
+
+
+def travel_cfg(lineObj, got_addr, start_addr, def_set, stack_move):
 
 	lineObj.set_line(start_addr)
 	cur_idx, cur = lineObj.get_cur_line()
@@ -373,18 +434,94 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 		instObj = InstParser(DISA)
 
 		print '%-30s'%(DISA),
-		print('\t\t\t\t\t'+str(def_set))
-		if DISA == ' movl.d32 -0x260(%esi, %eax, 4), %ecx':
-			import pdb
-			#pdb.set_trace()	
 
-		if instObj.op == 'retl' :
+		'''	
+		if cur[0] == 'MYSYM_810:':
+			import pdb
+			pdb.set_trace()		
+		'''
+		
+		original_stack_move = stack_move
+
+		if stack_move == 'unknown':
+			pass
+		elif instObj.op == 'pushl':
+			stack_move -= 4
+		elif instObj.op == 'popl':
+			stack_move += 4
+		elif instObj.op == 'calll':
+			if instObj.argv[1] in lineObj.label_retl_size_dict.keys():
+				stack_move -= lineObj.label_retl_size_dict[instObj.argv[1]]
+		elif instObj.argv[-1] == '%esp':
+			if instObj.op == 'addl':
+				stack_move += int(instObj.argv[-2][1:], 16)
+			elif instObj.op == 'subl':
+				stack_move -= int(instObj.argv[-2][1:], 16)
+			else:
+				stack_move = 'unknown'
+
+
+		if stack_move == 'unknown':
+			print('\t\t\t\t\t[u]\t\t'+ str(def_set))
+		else:
+			print('\t\t\t\t\t[%x]\t\t'%(stack_move)+ str(def_set))
+
+
+		if instObj.op == 'hlt':
 			break
-		elif len(instObj.argv) > 2:
+		elif instObj.op == 'leave':
+			stack_move = 0
+		elif instObj.op == 'retl' :
+			if stack_move < 0 and stack_move != 'unknown':
+				abort()
+			break
+
+		if len(instObj.argv) > 2:
 			remove_set = set()
-			for item in def_set:
+			add_set = set()
+			for cur_def in def_set:
+				'''
+				if '%esp' in cur_def:
+					disp = int(re.findall('(.*)\(%esp\)', cur_def)[0], 16) 
+					if disp-original_stack_move < 0:
+						remove_set.add(cur_def)
+						stsack_move = 'unknown'
+						continue
+						
+
+					elif disp-original_stack_move >= 10:
+						item = '0x%x(%%esp)'%(disp - original_stack_move)
+					else:
+						item = '%x(%%esp)'%(disp - original_stack_move)
+					print(item)
+				else:
+					item = cur_def	
+				'''
+				item = instObj.update_argument(cur_def, original_stack_move)
+				if item == 'invalid':
+					import pdb
+					#pdb.set_trace()
+					remove_set.add(cur_def)
+					stack_move = 'unknown'
+					continue
+
 				if item == instObj.argv[-2] and 'mov' == instObj.op[:3]:
-					def_set.add(instObj.argv[-1])
+					if '%esp' in instObj.argv[-1]:
+						stack_def_set = [i for i in def_set if '%esp' in i]
+						if len(stack_def_set) == 0:
+							stack_move = 0
+						elif original_stack_move != 'unknown':
+							disp = int(re.findall('(.*)\(%esp\)', instObj.argv[-1])[0], 16) 
+							if disp + original_stack_move >= 10:
+								candidate = '0x%x(%%esp)'%(disp + original_stack_move)
+							else:
+								candidate = '%x(%%esp)'%(disp + original_stack_move)
+
+							if candidate not in def_set:
+								import pdb
+								pdb.set_trace()
+								abort()
+					add_set.add(instObj.argv[-1])
 					break	
 				elif item in instObj.argv[-2] and len(instObj.get_register_names(item)) > 0:
 					#  leal.d8 0(%esi), %esi                             set(['%esi'])
@@ -393,7 +530,7 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 						if len(res) > 0:
 							disp, reg1 = res[0]
 							if 'MYSYM' not in disp and int(disp, 16) == 0 and reg1 == item:
-								def_set.add(instObj.argv[-1])
+								add_set.add(instObj.argv[-1])
 								break	
 					if item == instObj.argv[-2] or '(' not in item:
 						
@@ -413,7 +550,7 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 							disp, reg2 = res[0]
 							if disp == '0' and reg2 in def_set:
 								continue
-					remove_set.add(item)		
+					remove_set.add(cur_def)		
 
 				elif item in instObj.argv[-1] and len(instObj.get_register_names(item)) > 0:
 					handle_argv1(lineObj, instObj, got_addr)
@@ -423,11 +560,12 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 					for reg_name in reg_names[1:]:
 						if reg_name == instObj.argv[-1]:
 							import pdb
-							pdb.set_trace()
+							#pdb.set_trace()
 							remove_set.add(reg_names[0])
 							break
 
 			def_set -= remove_set
+			def_set |= add_set
 
 		elif instObj.op == 'popl':
 			if instObj.argv[-1] in def_set:
@@ -444,34 +582,27 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 					jump_list = jump_symbolize(lineObj, reg)
 					
 					for item in jump_list:
-						lineObj.add_node(item, def_set)
+						lineObj.add_node(item, def_set, stack_move)
 					break
 				else:
-					lineObj.add_node(label, def_set)
+					lineObj.add_node(label, def_set, stack_move)
 
 				break
-			lineObj.add_node(label, def_set)
+			lineObj.add_node(label, def_set, stack_move)
 			if instObj.op[:3] == 'jmp':
 				break
 
-
-		elif instObj.op == 'calll':
-			if '%eax' in def_set:
-				def_set.remove('%eax')
-			if instObj.argv[1] in ['abort', 'exit', '__assert_fail' , '_exit']:
-				break
-			if '__x86.get_pc_thunk.' in instObj.argv[1]:
-				break
 
 		elif len(instObj.argv) == 2:
 			# in case of floating pointer instruction
 			# TODO: floating pointer handling
 			import pdb
-			for item in def_set:
+			for cur_def in def_set:
+				item = instObj.update_argument(cur_def, original_stack_move)
 				if item  == instObj.argv[-1]:
 					print('remove~~~~~~~~~~~~push!!')
-					#pdb.set_trace()
-					def_set.remove(item)
+					#db.set_trace()
+					def_set.remove(cur_def)
 					break
                                 elif item in instObj.argv[-1]:
 
@@ -485,11 +616,22 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 						if reg_name == instObj.argv[-1]:
 							print('remove~~~~~~~~~~~~reg!!')
 							#pdb.set_trace()
-							remove_set.add(item)
+							remove_set.add(cur_def)
 							break
 					if len(remove_set) > 0:
 						def_set -= remove_set
 						break
+		if instObj.op == 'calll':
+			if '%eax' in def_set:
+				def_set.remove('%eax')
+			if instObj.is_exit_call():
+				break
+			if instObj.is_error_call():
+				if is_arg1_non_zero(lineObj):
+					break
+			if '__x86.get_pc_thunk.' in instObj.argv[1]:
+				break
+
 
 		cur_idx, cur = lineObj.get_next_line()
 
@@ -498,11 +640,34 @@ def travel_cfg(lineObj, got_addr, start_addr, def_set):
 
 
 		if len(cur[0])>0 and '__x86.get_pc_thunk.' not in cur[0]:
-			lineObj.add_node(cur[0][:-1], def_set)
+			lineObj.add_node(cur[0][:-1], def_set, stack_move)
 			break
-
 			
 	print('done!!')	
+
+
+def is_arg1_non_zero(lineObj):
+	cur_idx, cur = lineObj.get_cur_line()
+	prv_idx, prv = lineObj.get_prev_line(option='cfg')
+	
+	bNonZero = False
+	while cur_idx - 10 < prv_idx:
+		prevInst = InstParser(prv[1][0])
+	
+		if prevInst.op == 'pushl':
+			res = re.findall('\$(.)', prv[1][0])
+			if len(res) > 0  and 'MYSYM' not in res[0]:
+				val = int(res[0],16)
+				if val != 0:
+					print('done')
+					bNonZero = True
+			break
+
+
+		prv_idx, prv = lineObj.get_prev_line(option='cfg')
+
+	lineObj.set_position(cur_idx)
+	return bNonZero
 			
 def transform_byte2dword(resdic, section_from, addr):
         candidate = ''
@@ -634,9 +799,11 @@ def jump_symbolize(lineObj, reg):
 
 	if myMax == 0:
 		target = reg
+		conditional_jump = False
 
 		prevIdx,prev = lineObj.get_prev_line(option='cfg')
-		while prevIdx > minIdx:
+		#while prevIdx > minIdx:
+		for cnt in range(100):
 			print('jump4: ' + prev[1][0])
 			prevInst = InstParser(prev[1][0])
 			if prevInst.argv[-1] == target:
@@ -679,6 +846,14 @@ def jump_symbolize(lineObj, reg):
 							break
 				if myMax != 0:
 					break
+			if conditional_jump and  prevInst.op in ['cmpl','cmpb','cmpw']: # heuristic
+				if '$' == prevInst.argv[-1][0]: 
+					myMax = int(prevInst.argv[-1][1:], 16)
+				else:
+					myMax = int(prevInst.argv[-2][1:], 16)
+				break
+			elif prevInst.is_jmp_inst() and prevInst.op not in ['jmp','jmpl']:
+				conditional_jump = True
 
 
 			prevIdx,prev = lineObj.get_prev_line(option='cfg')
@@ -787,6 +962,43 @@ class InstParser:
 
                 return argv
 
+	def update_argument(self, arg, stack_move):
+		if stack_move == 'unknown':
+			return arg
+
+		if '%esp' in arg:
+			disp = int(re.findall('(.*)\(%esp\)', arg)[0], 16) 
+			if disp-stack_move < 0:
+				return 'invalid'	
+
+			elif disp-stack_move >= 10:
+				new_arg = '0x%x(%%esp)'%(disp - stack_move)
+			else:
+				new_arg = '%x(%%esp)'%(disp - stack_move)
+			print(new_arg)
+
+			return new_arg
+
+		return arg
+			
+
+	def is_exit_call(self):
+		if self.op == 'calll':
+			
+			funcs = ['abort', 'exit', '__assert_fail' , '_exit']
+			funcs = [ item+'__MYSYM2' for item in funcs]
+			if self.argv[1] in funcs:
+				return True
+		return False
+
+	def is_error_call(self):
+		if self.op == 'calll':
+			funcs = ['error']
+			funcs = [ item+'__MYSYM2' for item in funcs]
+			if self.argv[1] in funcs:
+				return True
+		return False
+
 	def is_jmp_inst(self):
 		if self.op in [ 'jo'
                                 ,'jno'
@@ -812,6 +1024,81 @@ class InstParser:
 			return True
 		return False
 	
+class StackObject:
+	def __init__(self, init_val):
+		self.init_val = init_val
+		self.disp = int(re.findall('(.*)\(%esp\)', init_val)[0], 16) 
+		self.stack_move = 0
+
+	def is_valid():
+		if self.disp-self.stack_move < 0:
+			return False
+		return True
+
+	def get_stack_val(self):
+		if self.is_valid():
+			return 'invalid'
+
+		if disp-stack_move >= 10:
+			new_arg = '0x%x(%%esp)'%(disp - stack_move)
+		else:
+			new_arg = '%x(%%esp)'%(disp - stack_move)
+		print(new_arg)
+
+		return new_arg
+
+	def update_stack(self, stack_move):
+		self.stack_move += stack_move
+		return self.is_valid()
+
+
+	def __str__(self):
+		return '%s [ %s + 0x%x]'%(self.get_stack_val(), self.init_val, self.stack_move)
+
+
+	def check_use_of_got_pointer(self, arg):
+		if self.get_stack_val() == arg:
+			return True:
+		return False:
+
+class RegisterObject:
+	def __init__(self, init_val):
+		self.init_val = inti_val
+		self.reg = re.findall('(%...)', init_val)[0]
+		self.reg_name_list = self.get_register_names(init_val)
+
+	def check_use_of_got_pointer(self, arg):
+		for reg_name in self.reg_name_list:
+			if reg_name == arg
+				return True
+		return False
+
+	def __str__(self):
+		return self.init_val
+
+
+        def get_register_names(self, reg):
+                eax_reg= ['%eax','%ax','%ah','%al']
+                ebx_reg= ['%ebx','%bx','%bh','%bl']
+                ecx_reg= ['%ecx','%cx','%ch','%cl']
+                edx_reg= ['%edx','%dx','%dh','%dl']
+                esi_reg= ['%esi','%si']
+                edi_reg= ['%edi','%di']
+                ebp_reg= ['%ebp','%bp']
+                esp_reg= ['%esp','%sp']
+
+                if reg in eax_reg: return eax_reg
+                if reg in ebx_reg: return ebx_reg
+                if reg in ecx_reg: return ecx_reg
+                if reg in edx_reg: return edx_reg
+                if reg in edi_reg: return edi_reg
+                if reg in esi_reg: return esi_reg
+                if reg in ebp_reg: return ebp_reg
+                if reg in esp_reg: return esp_reg	
+
+		abort() 
+
+
 class LineObject:
 	def __init__(self, resdic, section='.text'):
 		self.resdic = resdic
@@ -847,6 +1134,29 @@ class LineObject:
 
 		self.call_site = dict()
 
+
+		self.jmp_site_dict = dict()
+		self.retl_x_list = []
+		self.get_jmp_site_info()
+
+		self.label_retl_size_dict = dict()	
+
+	def get_jmp_site_info(self):
+		for addr in self.resdic[self.section].keys():
+			instObj = InstParser(self.resdic[self.section][addr][1][0])
+			if len(re.findall('retl\s\$',self.resdic[self.section][addr][1][0])) > 0:
+				self.retl_x_list.append(addr)
+			elif instObj.is_jmp_inst() and 'MYSYM' in instObj.argv[1]:
+				label = instObj.argv[1]
+				if label in self.jmp_site_dict:
+					self.jmp_site_dict[label].append(addr)
+				else:
+					self.jmp_site_dict[label] = [addr]
+
+
+					
+		
+
 	def set_idx_def_dic(self, idx, def_dic):
 		self.global_def_dic[idx] = def_dic.copy()
 	def get_idx_def_dic(self, idx):
@@ -864,7 +1174,13 @@ class LineObject:
 	def get_symbol_name(self, addr):
 		if addr not in self.global_map.keys():
 			return None
+
+
 		section = self.global_map[addr]
+
+		#TODO: prevent symbol error
+		if self.section != '.plt' and section == '.got.plt':
+			return '.got.plt'
 		
 		symbol_name = self.resdic[section][addr][0]
 
@@ -878,6 +1194,18 @@ class LineObject:
 		self.resdic[section][addr][0] = symbol_name + ':'
 
 		return symbol_name
+
+	def handle_retl_x(self, end):
+		self.set_line(end)
+		DISA = self.get_cur_line()[1][1][0]
+		
+		size =  int(re.findall('retl\s\$(.*)',DISA)[0], 16)
+
+		self.get_prev_line()
+		addr = self.get_cur_addr()
+
+		return addr, size
+
 
 	def handle_get_pc_thunk(self, start):
 		self.set_line(start)
@@ -973,7 +1301,7 @@ class LineObject:
 
 		return None
 
-	def add_node(self, label, def_set):
+	def add_node(self, label, def_set, stack_move):
 		if label not in self.label_dict:
 			return 
 
@@ -984,12 +1312,15 @@ class LineObject:
 		if addr in self.node_list:
 			return None
 
-		print '\t\t\t\t\tadd_node: %10s %x'%(label,addr), 
+		if 'unknown' == stack_move:
+			print '\t\t\t\t\tadd_node: %10s %x(u)'%(label,addr), 
+		else:
+			print '\t\t\t\t\tadd_node: %10s %x(%x)'%(label,addr,stack_move), 
 		print str(def_set)
 
 		self.record_call_site(label)
 
-		self.node_list.append((addr,def_set.copy()))
+		self.node_list.append((addr,def_set.copy(), stack_move))
 		return addr
 
 	def record_call_site(self, label):
@@ -1006,22 +1337,43 @@ class LineObject:
 
 	def pop_node(self):
 		if len(self.node_list) > 0:
-			addr,def_set = self.node_list.pop(0)
+			addr,def_set, stack_move = self.node_list.pop(0)
 			while addr in self.visit_site:
 				if len(self.node_list) == 0:
-					return None, None
-				addr,def_set = self.node_list.pop(0)
-			print '\t\t\t\t\tpop node : %x'%(addr), 
+					return None, None, None
+				addr,def_set, stack_move = self.node_list.pop(0)
+			if 'unknown' == stack_move:
+				print '\t\t\t\t\tpop node : %x(u)'%(addr), 
+			else:
+				print '\t\t\t\t\tpop node : %x(%x)'%(addr, stack_move), 
 			print str(def_set)
 			self.mark_visit_site(addr)
-			return addr, def_set
+			return addr, def_set, stack_move
 
-		return None,None
+		return None,None,None
 
-		
 	def mark_visit_site(self, addr):
 		self.visit_site.add(addr)
 
+	def push_jmp_site(self, label, size):
+		print '\t\t\t\t\tpush label: %10s %x'%(label, size) 
+		if label not in self.label_retl_size_dict:
+			self.label_retl_size_dict[label] = size
+
+			if label not in self.jmp_site_dict.keys():
+				return
+			print(self.jmp_site_dict[label])
+			for addr in self.jmp_site_dict[label]:
+				self.node_list.append((addr,size))
+
+	
+		
+	def pop_jmp_from_site(self):
+		if len(self.node_list) > 0:
+			addr,size = self.node_list.pop(-1)
+			print '\t\t\t\t\tpop jmp from site: %x %x'%(addr, size), 
+			return addr, size
+		return None, None
 
 
 
