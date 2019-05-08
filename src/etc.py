@@ -637,7 +637,7 @@ def gen_assemblyfile_pic(LOC, resdic, filename, CHECKSEC_INFO, comment, SYMTAB):
 				elif sectionName in TreatThisSection2DATA:
 					f.write("\n" + ".section " + ".data" + "\n")
 					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
-				elif sectionName in ['.data', '.bss']:
+				elif sectionName in ['.data', '.bss', '.got']:
 					f.write("\n" + ".section " + ".my_" + sectionName[1:] + ', "wa" ' + "\n")
 					f.write("\n" + "# Actually, here was .section " + sectionName + "\n")
 				elif sectionName in ['.rodata']:
@@ -649,7 +649,7 @@ def gen_assemblyfile_pic(LOC, resdic, filename, CHECKSEC_INFO, comment, SYMTAB):
 				# 섹션의 align 은 디폴트로 16. (init_array, fini_array 는 제외)
 				if sectionName == '.init_array' or sectionName == '.fini_array':
 					pass
-				elif sectionName in ['.data', '.bss']:
+				elif sectionName in ['.data', '.bss', '.got', 'rodata']:
 					pass
 				else:
 					f.write(".align 16\n") # 모든섹션의 시작주소는 얼라인되게끔 
