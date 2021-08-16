@@ -47,7 +47,7 @@ Once you run compile script emit from Reassemblabla, output binary compiled.
 ## Technical deatils
 ### Lazy symbilization 
 Reassemblabla uses our novel idea *Lazy symbolization*. In which symbolizationdeferred until runtime.  
-Click [Paper(Kor)](/paper/On-designing-an-efficient-binary-reassembler.pdf) to see more technical details.  
+Click [Paper(Kor)](/paper/On-designing-an-efficient-binary-reassembler.pdf)(Best paper in KISC 2018)to see more technical details.  
 <br>
 <img src="./paper/Lazy-symbolization.png" alt="lazy-symbolization" width="500"/>
 <br>
