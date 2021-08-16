@@ -2,6 +2,9 @@
 Disassembler creates the reassemblable disassembly  
 **100% correctness** in reassemble experiment on Coreutils binaries. 
 
+<br>  
+<br>
+
 ## How to use it
 
     $ python Reassemblablabla_x86.py --file <Binary name> --align
@@ -27,7 +30,7 @@ Reassemblabla runs, and finally below messages appears on shell.
     [+] assembly file  : mytest_reassemblable.s
     [+] compile script : mytest_compile.sh
 
-실행 결과 2개의 파일이 생성됩니다.  
+below two file is created after running it.    
 - `mytest_reassemblable.s` : reassemblable disassembly file
 - `mytest_compile.sh`       : compile script used to compile above disassembly file. 
 
@@ -42,17 +45,20 @@ Once you run compile script emit from Reassemblabla, output binary compiled.
 <br>
 
 ## Technical deatils
-### Lazy symbilization
+### Lazy symbilization 
 Reassemblabla uses our novel idea *Lazy symbolization*. In which symbolizationdeferred until runtime.  
-<img src="./paper/Lazy-symbolization.png" alt="lazy-symbolization" width="500"/>
-
+Click [Paper(Kor)](/paper/On-designing-an-efficient-binary-reassembler.pdf) to see more technical details.  
 <br>
-
-### Compare with existing tools
+<img src="./paper/Lazy-symbolization.png" alt="lazy-symbolization" width="500"/>
+<br>
+Below table compares our *Reassemblabla* with existing tools.  
+<br> 
 <img src="./paper/comparison.png" alt="comparison" width="500"/>
 
-<br>
-<br>
 
-We're open to discuss about our tools and technology.  
-If you'd like to co-work with us, contact [Here](https://www.linkedin.com/in/jiwonchoi-dev/)
+<br>
+<br>
+<br>
+...We're happy to discuss about our tools and technology.   
+
+If you'd like to co-work with us, feel free to contact [Here](https://www.linkedin.com/in/jiwonchoi-dev/).  
